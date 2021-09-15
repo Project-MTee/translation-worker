@@ -13,7 +13,7 @@ from helpers import Response, Request, RequestSchema, MQItem
 from settings import SIZE_WARNING_THRESHOLD, SIZE_ERROR_THRESHOLD
 from nmt_worker import TranslationWorker
 
-LOGGER = logging.getLogger("nmt-worker")
+LOGGER = logging.getLogger("nmt_worker")
 
 
 class MQConsumer:

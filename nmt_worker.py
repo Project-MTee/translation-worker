@@ -8,12 +8,10 @@ from helpers import Response, Request
 import settings
 from translator import Translator
 
-logger = logging.getLogger("nmt-worker")
+logger = logging.getLogger("nmt_worker")
 
 
 class TranslationWorker:
-    _consumer = None
-
     def __init__(self, nmt_model, spm_prefix, dict_path, beam_size):
         self.translator = Translator()  # TODO implement model loading
         logger.info("All NMT models loaded")
