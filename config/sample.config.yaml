@@ -1,0 +1,23 @@
+exchange: translation
+# List of supported source & target language pair mappings. 2-letter codes should be used (if available)
+language_pairs:
+  - source:
+    target:
+# supported input types
+input_types:
+  plain: true
+  document: true
+  web: true
+  asr: true
+# supported domains
+domains:
+  - general
+  - legal
+  - military
+  - crisis
+# Parameters required by the TranslationWorker, the keys in this file should match the arguments of the class.
+parameters:
+  nmt_model: models/some_model/checkpoint.pt
+  spm_prefix: models/some_model/spm/sp_model
+  dict_path: models/some_model/dicts/
+  beam_size: 5
