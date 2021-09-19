@@ -17,7 +17,5 @@ domains:
   - crisis
 # Parameters required by the TranslationWorker, the keys in this file should match the arguments of the class.
 parameters:
-  nmt_model: models/some_model/checkpoint.pt
-  spm_prefix: models/some_model/spm/sp_model
-  dict_path: models/some_model/dicts/
-  beam_size: 5
+  nmt_path: models/nmt_model_dir
+  spm_model: models/spm_model_dir/sentencepiece.model

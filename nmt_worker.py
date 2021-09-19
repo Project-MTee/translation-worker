@@ -12,8 +12,11 @@ logger = logging.getLogger("nmt_worker")
 
 
 class TranslationWorker:
-    def __init__(self, nmt_model, spm_prefix, dict_path, beam_size):
-        self.translator = Translator()  # TODO implement model loading
+    def __init__(self, nmt_path, spm_model):
+        self.translator = Translator(
+            checkpoint_path=nmt_path,
+            spm_model=spm_model
+        )
         logger.info("All NMT models loaded")
 
 

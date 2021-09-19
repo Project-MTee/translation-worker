@@ -18,7 +18,7 @@ _parser.add_argument('--log-config', type=FileType('r'), default='config/logging
 _args = _parser.parse_known_args()[0]
 logging.config.fileConfig(_args.log_config.name)
 
-with open(_args.config.name, 'r', encoding='utf-8') as f:
+with open(_args.worker_config.name, 'r', encoding='utf-8') as f:
     _config = yaml.load(f, Loader=SafeLoader)
 
 EXCHANGE_NAME = _config['exchange']

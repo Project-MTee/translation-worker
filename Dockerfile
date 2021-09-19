@@ -30,10 +30,11 @@ USER app
 
 COPY --from=build --chown=app:app /venv /venv
 ENV PATH="/venv/bin:${PATH}"
-COPY --chown=app:app . .
 
 RUN python -c "import nltk; nltk.download(\"punkt\")";
 
-RUN echo "python nmt_worker.py --worker \$WORKER_NAME" > entrypoint.sh
+COPY --chown=app:app . .
+
+RUN echo "python nmt_worker.py" > entrypoint.sh
 
 ENTRYPOINT ["bash", "entrypoint.sh"]

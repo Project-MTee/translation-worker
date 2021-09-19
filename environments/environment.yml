@@ -2,11 +2,17 @@ channels:
   - pytorch
   - anaconda
   - conda-forge
-dependencies: # TODO add fairseq, sentencepiece, etc.
+dependencies:
   - python=3.7.5
   - nltk==3.4.5
   - python-dotenv==0.15.0
   - marshmallow==3.10.0
   - pytorch==1.8.1
   - pyyaml==5.3.1
-  - pika>=1.1.0
+  - numpy==1.20.3
+  - pika==1.2.0
+  - git
+  - pip
+  - pip:
+      - git+https://github.com/pytorch/fairseq.git@d6855baec88f99ac776962027b91d404fe917eea
+      - sentencepiece

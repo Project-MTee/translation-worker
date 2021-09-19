@@ -64,7 +64,7 @@ class MQConsumer:
         any alternative routing keys as needed.
         """
         LOGGER.info(f'Connecting to RabbitMQ server: {{host: {self.connection_parameters.host}, '
-                    f'port :{self.connection_parameters.port}}}')
+                    f'port: {self.connection_parameters.port}}}')
         connection = pika.BlockingConnection(self.connection_parameters)
         self.channel = connection.channel()
         self.channel.queue_declare(queue=self.queue_name)

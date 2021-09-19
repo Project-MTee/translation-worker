@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, asdict
 from marshmallow import Schema, fields, validate
-from typing import Optional
+from typing import Optional, Union
 
 
 @dataclass
@@ -29,7 +29,7 @@ class Request:
     A dataclass that can be used to store NMT requests
     # TODO convert between different ISO language code formats (post_init)
     """
-    text: Optional[str, list]
+    text: Optional[Union [str, list]]
     src: str
     tgt: str
     domain: str
@@ -41,7 +41,7 @@ class Response:
     """
     A dataclass that can be used to store responses and transfer them over the message queue if needed.
     """
-    translation: Optional[str, list] = None
+    translation: Optional[Union [str, list]] = None
     status_code: int = 200
     status: str = 'OK'
 
