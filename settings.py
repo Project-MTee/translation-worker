@@ -25,7 +25,7 @@ EXCHANGE_NAME = _config['exchange']
 WORKER_PARAMETERS = _config['parameters']
 
 ROUTING_KEYS = []
-for language_pair in _config['language_pairs']:  # TODO for 3-letter codes as well?
+for language_pair in _config['language_pairs']:
     for domain in _config['domains']:
         for input_type, allowed in _config['input_types'].items():
             if allowed:
@@ -41,6 +41,3 @@ MQ_PARAMETERS = ConnectionParameters(
         password=environ.get('MQ_PASSWORD', 'guest')
     )
 )
-
-SIZE_WARNING_THRESHOLD = int(environ.get('SIZE_WARNING_THRESHOLD', 64))
-SIZE_ERROR_THRESHOLD = int(environ.get('SIZE_ERROR_THRESHOLD', 128))

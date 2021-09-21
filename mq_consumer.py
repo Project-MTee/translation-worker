@@ -10,7 +10,6 @@ import pika
 import pika.exceptions
 
 from helpers import Response, Request, RequestSchema, MQItem
-from settings import SIZE_WARNING_THRESHOLD, SIZE_ERROR_THRESHOLD
 from nmt_worker import TranslationWorker
 
 LOGGER = logging.getLogger("nmt_worker")
@@ -109,14 +108,6 @@ class MQConsumer:
             response = Response(status_code=500, status="Unknown internal error during translation.").encode()
 
         respose_size = getsizeof(response)
-        if respose_size > 1024 * 1024 * SIZE_WARNING_THRESHOLD:
-            LOGGER.warning(f"Response size exceeds the recommended threshold: {{id: {mq_item.correlation_id},"
-                           f"size: {respose_size}}}")
-        if respose_size > 1024 * 1024 * SIZE_ERROR_THRESHOLD:
-            LOGGER.error(f"Response size exceeds RabbitMQ message size threshold: {{id: {mq_item.correlation_id},"
-                         f"size: {respose_size}}}")
-            response = Response(status_code=413, status=f"Response size exceeds internal communication message size "
-                                                        f"threshold. Size: {respose_size}").encode()
 
         self._respond(channel, mq_item, response)
         t2 = time()

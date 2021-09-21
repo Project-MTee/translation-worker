@@ -27,7 +27,6 @@ class RequestSchema(Schema):
 class Request:
     """
     A dataclass that can be used to store NMT requests
-    # TODO convert between different ISO language code formats (post_init)
     """
     text: Optional[Union [str, list]]
     src: str
