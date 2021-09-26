@@ -1,19 +1,16 @@
 language_pairs:
   - source:
     target:
-# supported input types
 input_types:
   plain: true
   document: true
   web: true
   asr: true
-# supported domains
 domains:
   - general
   - legal
   - military
   - crisis
-# Parameters required by the TranslationWorker, the keys in this file should match the arguments of the class.
 parameters:
-  nmt_path: models/nmt_model_dir
-  spm_model: models/spm_model_dir/sentencepiece.model
+  checkpoint_path: models
+  spm_model: models/spm.model
