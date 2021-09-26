@@ -22,7 +22,6 @@ FROM debian:buster
 
 ENV PYTHONIOENCODING=utf-8
 WORKDIR /app
-VOLUME /app/models
 
 RUN adduser --disabled-password --gecos "app" app && \
     chown -R app:app /app

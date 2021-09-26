@@ -4,10 +4,6 @@ from argparse import ArgumentParser, FileType
 import yaml
 from yaml.loader import SafeLoader
 from pika import ConnectionParameters, credentials
-from dotenv import load_dotenv
-
-load_dotenv("config/.env")
-load_dotenv("config/sample.env")
 
 _parser = ArgumentParser()
 _parser.add_argument('--worker-config', type=FileType('r'), default='config/config.yaml',
@@ -21,7 +17,7 @@ logging.config.fileConfig(_args.log_config.name)
 with open(_args.worker_config.name, 'r', encoding='utf-8') as f:
     _config = yaml.load(f, Loader=SafeLoader)
 
-EXCHANGE_NAME = _config['exchange']
+EXCHANGE_NAME = 'translation'
 WORKER_PARAMETERS = _config['parameters']
 
 ROUTING_KEYS = []

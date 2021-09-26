@@ -1,5 +1,3 @@
-exchange: translation
-# List of supported source & target language pair mappings. 2-letter codes should be used (if available)
 language_pairs:
   - source:
     target:

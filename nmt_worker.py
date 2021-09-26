@@ -12,13 +12,14 @@ logger = logging.getLogger("nmt_worker")
 
 
 class TranslationWorker:
-    def __init__(self, nmt_path, spm_model):
+    def __init__(self,
+                 checkpoint_path: str = 'models',
+                 spm_model: str = 'models/spm.model'):
         self.translator = Translator(
-            checkpoint_path=nmt_path,
+            checkpoint_path=checkpoint_path,
             spm_model=spm_model
         )
         logger.info("All NMT models loaded")
-
 
     @staticmethod
     def _sentence_tokenize(text: Union[str, List]) -> (List, Optional[List]):
@@ -41,33 +42,28 @@ class TranslationWorker:
         else:
             sentences = [sent.strip() for sent in text]
 
-        return sentences, delimiters
-
-    def process_request(self, request: Request) -> Response:
-
-        sentences, delimiters = self._sentence_tokenize(request.text)
         length = sum([len(sent) for sent in sentences])
 
+        return sentences, delimiters, length
+
+    def process_request(self, request: Request) -> Response:
+        sentences, delimiters, length = self._sentence_tokenize(request.text)
+
         if length == 0:
-            # No translatable content in input
             if type(request.text) == str:
                 return Response(translation="")
             else:
-                return Response(translation=[])
+                return Response(translation=['' for _ in request.text])
 
-        else:
-            src_lang = request.src
-            tgt_lang = request.tgt
+        translations = self.translator.translate(sentences,
+                                                 src=request.src,
+                                                 tgt=request.tgt,
+                                                 domain=request.text,
+                                                 input_type=request.input_type)
+        if delimiters:
+            translations = ''.join(itertools.chain.from_iterable(zip(delimiters, translations))) + delimiters[-1]
 
-            translations = self.translator.translate(sentences,
-                                                     src=src_lang,
-                                                     tgt=tgt_lang,
-                                                     domain=request.text,
-                                                     input_type=request.input_type)
-            if delimiters:
-                translations = ''.join(itertools.chain.from_iterable(zip(delimiters, translations))) + delimiters[-1]
-
-            return Response(translation=translations)
+        return Response(translation=translations)
 
 
 if __name__ == "__main__":

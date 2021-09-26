@@ -4,11 +4,11 @@ from fairseq.models.transformer import TransformerModel
 
 from tag_utils import preprocess_tags, postprocess_tags
 
-logger = logging.getLogger("nmt-worker")
+logger = logging.getLogger("nmt_worker")
 
 
 class Translator:
-    def __init__(self, checkpoint_path, spm_model):
+    def __init__(self, checkpoint_path: str, spm_model: str):
         self.model = TransformerModel.from_pretrained(
             checkpoint_path,
             checkpoint_file='checkpoint_best.pt',
@@ -23,32 +23,6 @@ class Translator:
         translations = [translation if detagged[idx] != '' else '' for idx, translation in
                         enumerate(self.model.translate(detagged))]
 
-        retagged = postprocess_tags(translations, tags)
+        retagged = postprocess_tags(translations, tags, input_type)
 
         return retagged
-
-
-if __name__ == "__main__":
-    # File translation mode
-    from argparse import ArgumentParser, FileType
-
-    parser = ArgumentParser()
-    parser.add_argument('checkpoint', help="checkpoint folder path")
-    parser.add_argument('spm', type=FileType('r'), help="sentencepiece .model file path")
-    parser.add_argument('input', type=FileType('r'), help="input text file")
-    parser.add_argument('output', type=FileType('w'), help="output text file")
-    args = parser.parse_args()
-
-    translator = Translator(args.checkpoint, args.spm.name)
-
-    in_file = open(args.input.name, 'r', encoding='utf-8')
-    out_file = open(args.output.name, 'w', encoding='utf-8')
-
-    while True:
-        text = in_file.readline()
-        if not text:
-            break
-        out_file.write(translator.translate([text], 'en', 'et', 'general', 'test')[0]+'\n')
-
-    in_file.close()
-    out_file.close()
