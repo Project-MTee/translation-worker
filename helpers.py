@@ -16,7 +16,9 @@ class MQItem:
 
 
 class RequestSchema(Schema):
-    text = fields.Raw(required=True, validate=(lambda obj: type(obj) in [str, list]))
+    text = fields.Raw(required=True, validate=(
+        lambda obj: type(obj) == str or (type(obj) == list and all(type(item) == str for item in obj))),
+                      )
     src = fields.Str(required=True)
     tgt = fields.Str(required=True)
     domain = fields.Str(required=True)
@@ -28,7 +30,7 @@ class Request:
     """
     A dataclass that can be used to store NMT requests
     """
-    text: Optional[Union [str, list]]
+    text: Optional[Union[str, list]]
     src: str
     tgt: str
     domain: str
@@ -40,7 +42,7 @@ class Response:
     """
     A dataclass that can be used to store responses and transfer them over the message queue if needed.
     """
-    translation: Optional[Union [str, list]] = None
+    translation: Optional[Union[str, list]] = None
     status_code: int = 200
     status: str = 'OK'
 

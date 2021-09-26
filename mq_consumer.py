@@ -100,16 +100,16 @@ class MQConsumer:
         try:
             request = RequestSchema().load(mq_item.request)
             request = Request(**request)
-            response = self.worker.process_request(request).encode()
+            response = self.worker.process_request(request)
         except ValidationError as error:
-            return Response(status=f'Error parsing input: {error.messages}', status_code=400)
+            response = Response(status=f'Error parsing input: {error.messages}', status_code=400)
         except Exception as e:
             LOGGER.error(e)
-            response = Response(status_code=500, status="Unknown internal error during translation.").encode()
+            response = Response(status_code=500, status="Unknown internal error during translation.")
 
         respose_size = getsizeof(response)
 
-        self._respond(channel, mq_item, response)
+        self._respond(channel, mq_item, response.encode())
         t2 = time()
 
         LOGGER.info(f"Request processed: {{id: {mq_item.correlation_id}, duration: {round(t2 - t1, 3)} s, "
