@@ -1,69 +1,69 @@
 import itertools
 import logging
-from typing import Optional, List, Union
+from typing import List
 
 from nltk import sent_tokenize
 from helpers import Response, Request
 
 import settings
-from translator import Translator
+from tag_utils import preprocess_tags, postprocess_tags
 
 logger = logging.getLogger("nmt_worker")
 
 
 class TranslationWorker:
-    def __init__(self,
-                 checkpoint_path: str = 'models',
-                 spm_model: str = 'models/spm.model'):
-        self.translator = Translator(
-            checkpoint_path=checkpoint_path,
-            spm_model=spm_model
-        )
+    model = None
+
+    def __init__(self, **kwargs):
+        self._load_model(**kwargs)
         logger.info("All NMT models loaded")
 
     @staticmethod
-    def _sentence_tokenize(text: Union[str, List]) -> (List, Optional[List]):
+    def _sentence_tokenize(text: str) -> (List, List):
         """
         Split text into sentences and save info about delimiters between them to restore linebreaks,
         whitespaces, etc.
         """
-        delimiters = None
-        if type(text) == str:
-            sentences = [sent.strip() for sent in sent_tokenize(text)]
-            try:
-                delimiters = []
-                for sentence in sentences:
-                    idx = text.index(sentence)
-                    delimiters.append(text[:idx])
-                    text = text[idx + len(sentence):]
-                delimiters.append(text)
-            except ValueError:
-                delimiters = ['', *[' ' for _ in range(len(sentences) - 1)], '']
-        else:
-            sentences = [sent.strip() for sent in text]
+        delimiters = []
+        sentences = [sent.strip() for sent in sent_tokenize(text)]
+        try:
+            for sentence in sentences:
+                idx = text.index(sentence)
+                delimiters.append(text[:idx])
+                text = text[idx + len(sentence):]
+            delimiters.append(text)
+        except ValueError:
+            delimiters = ['', *[' ' for _ in range(len(sentences) - 1)], '']
 
-        length = sum([len(sent) for sent in sentences])
+        return sentences, delimiters
 
-        return sentences, delimiters, length
+    def _load_model(self, checkpoint_path: str, spm_model: str):
+        from fairseq.models.transformer import TransformerModel
+        self.model = TransformerModel.from_pretrained(
+            checkpoint_path,
+            checkpoint_file='checkpoint_best.pt',
+            bpe='sentencepiece',
+            sentencepiece_model=spm_model
+        )
+
+    def _translate(self, sentences: List[str], **_) -> List[str]:
+        return self.model.translate(sentences)
 
     def process_request(self, request: Request) -> Response:
-        sentences, delimiters, length = self._sentence_tokenize(request.text)
+        inputs = [request.text] if type(request.text) == str else request.text
+        translations = []
 
-        if length == 0:
-            if type(request.text) == str:
-                return Response(translation="")
-            else:
-                return Response(translation=['' for _ in request.text])
+        for text in inputs:
+            sentences, delimiters = self._sentence_tokenize(text)
+            detagged, tags = preprocess_tags(sentences, request.input_type)
+            translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(
+                self._translate(sentences, src=request.src, tgt=request.tgt, domain=request.domain))]
+            retagged = postprocess_tags(translated, tags, request.input_type)
+            translations.append(''.join(itertools.chain.from_iterable(zip(delimiters, retagged))) + delimiters[-1])
 
-        translations = self.translator.translate(sentences,
-                                                 src=request.src,
-                                                 tgt=request.tgt,
-                                                 domain=request.text,
-                                                 input_type=request.input_type)
-        if delimiters:
-            translations = ''.join(itertools.chain.from_iterable(zip(delimiters, translations))) + delimiters[-1]
+        response = Response(translation=translations[0] if type(request.text) else translations)
 
-        return Response(translation=translations)
+        return response
 
 
 if __name__ == "__main__":
