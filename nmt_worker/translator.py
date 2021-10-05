@@ -3,19 +3,22 @@ import logging
 from typing import List
 
 from nltk import sent_tokenize
-from data_types import Response, Request
-
-import settings
-from tag_utils import preprocess_tags, postprocess_tags
+from .utils import Response, Request
+from .tag_utils import preprocess_tags, postprocess_tags
 
 logger = logging.getLogger("nmt_worker")
 
 
-class TranslationWorker:
+class Translator:
     model = None
 
-    def __init__(self, **kwargs):
-        self._load_model(**kwargs)
+    def __init__(self, modular: bool = False, **kwargs):
+        if modular:
+            self._load_modular_model(**kwargs)
+            self.translate = self._translate_modular
+        else:
+            self._load_model(**kwargs)
+            self.translate = self._translate
         logger.info("All NMT models loaded")
 
     @staticmethod
@@ -46,8 +49,18 @@ class TranslationWorker:
             sentencepiece_model=spm_model
         )
 
+    def _load_modular_model(self, checkpoint_path: str, spm_prefix: str):
+        from .modular_interface import ModularHubInterface
+        self.model = ModularHubInterface.from_pretrained(
+            model_path = f'{checkpoint_path}/checkpoint_best.pt',
+            sentencepiece_prefix = spm_prefix,
+            dictionary_path = checkpoint_path)
+
     def _translate(self, sentences: List[str], **_) -> List[str]:
         return self.model.translate(sentences)
+
+    def _translate_modular(self, sentences: List[str], src: str, tgt: str, **_) -> List[str]:
+        return self.model.translate(sentences, src_language=src, tgt_language=tgt)
 
     def process_request(self, request: Request) -> Response:
         inputs = [request.text] if type(request.text) == str else request.text
@@ -57,22 +70,11 @@ class TranslationWorker:
             sentences, delimiters = self._sentence_tokenize(text)
             detagged, tags = preprocess_tags(sentences, request.input_type)
             translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(
-                self._translate(sentences, src=request.src, tgt=request.tgt, domain=request.domain))]
+                self.translate(detagged, src=request.src, tgt=request.tgt, domain=request.domain))]
             retagged = postprocess_tags(translated, tags, request.input_type)
             translations.append(''.join(itertools.chain.from_iterable(zip(delimiters, retagged))) + delimiters[-1])
 
-        response = Response(translation=translations[0] if type(request.text) else translations)
+        response = Response(translation=translations[0] if type(request.text) == str else translations)
 
         return response
 
-
-if __name__ == "__main__":
-    from mq_consumer import MQConsumer
-
-    worker = TranslationWorker(**settings.WORKER_PARAMETERS)
-    consumer = MQConsumer(worker=worker,
-                          connection_parameters=settings.MQ_PARAMETERS,
-                          exchange_name=settings.EXCHANGE_NAME,
-                          routing_keys=settings.ROUTING_KEYS)
-
-    consumer.start()

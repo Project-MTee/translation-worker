@@ -9,14 +9,14 @@ from typing import List
 import pika
 import pika.exceptions
 
-from data_types import Response, Request, RequestSchema
-from nmt_worker import TranslationWorker
+from .utils import Response, Request, RequestSchema
+from .translator import Translator
 
 LOGGER = logging.getLogger("nmt_worker")
 
 
 class MQConsumer:
-    def __init__(self, worker: TranslationWorker,
+    def __init__(self, translator: Translator,
                  connection_parameters: pika.connection.ConnectionParameters,
                  exchange_name: str,
                  routing_keys: List[str]):
@@ -24,13 +24,13 @@ class MQConsumer:
         Initializes a RabbitMQ consumer class that listens for requests for a specific worker and responds to
         them.
 
-        :param worker: A worker instance to be used.
+        :param translator: A worker instance to be used.
         :param connection_parameters: RabbitMQ connection_parameters parameters.
         :param exchange_name: RabbitMQ exchange name.
         :param routing_keys: RabbitMQ routing keys. The actual queue name will also automatically include the exchange
         name to ensure that unique queues names are used.
         """
-        self.worker = worker
+        self.translator = translator
 
         self.exchange_name = exchange_name
         self.routing_keys = sorted(routing_keys)
@@ -85,6 +85,7 @@ class MQConsumer:
                               routing_key=properties.reply_to,
                               properties=pika.BasicProperties(
                                   correlation_id=properties.correlation_id,
+                                  content_type='application/json',
                                   headers={
                                       'RequestId': properties.headers["RequestId"],
                                       'ReturnMessageType': properties.headers["ReturnMessageType"]
@@ -103,7 +104,7 @@ class MQConsumer:
             request = json.loads(body)
             request = RequestSchema().load(request)
             request = Request(**request)
-            response = self.worker.process_request(request)
+            response = self.translator.process_request(request)
         except ValidationError as error:
             response = Response(status=f'Error parsing input: {error.messages}', status_code=400)
         except Exception as e:

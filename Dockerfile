@@ -34,6 +34,6 @@ RUN python -c "import nltk; nltk.download(\"punkt\")";
 
 COPY --chown=app:app . .
 
-RUN echo "python nmt_worker.py" > entrypoint.sh
+RUN echo "python main.py" > entrypoint.sh
 
 ENTRYPOINT ["bash", "entrypoint.sh"]

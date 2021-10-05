@@ -36,4 +36,4 @@ class Response:
     status: str = 'OK'
 
     def encode(self) -> bytes:
-        return json.dumps(asdict(self)).encode("utf8")
+        return json.dumps(asdict(self)).encode()
