@@ -9,7 +9,7 @@ from typing import List
 import pika
 import pika.exceptions
 
-from helpers import Response, Request, RequestSchema, MQItem
+from data_types import Response, Request, RequestSchema
 from nmt_worker import TranslationWorker
 
 LOGGER = logging.getLogger("nmt_worker")
@@ -76,15 +76,21 @@ class MQConsumer:
         self.channel.basic_consume(queue=self.queue_name, on_message_callback=self._on_request)
 
     @staticmethod
-    def _respond(channel: pika.adapters.blocking_connection.BlockingChannel, mq_item: MQItem, response: bytes):
+    def _respond(channel: pika.adapters.blocking_connection.BlockingChannel, method: pika.spec.Basic.Deliver,
+                 properties: pika.BasicProperties, body: bytes):
         """
         Publish the response to the callback queue and acknowledge the original queue item.
         """
         channel.basic_publish(exchange='',
-                              routing_key=mq_item.reply_to,
-                              properties=pika.BasicProperties(correlation_id=mq_item.correlation_id),
-                              body=response)
-        channel.basic_ack(delivery_tag=mq_item.delivery_tag)
+                              routing_key=properties.reply_to,
+                              properties=pika.BasicProperties(
+                                  correlation_id=properties.correlation_id,
+                                  headers={
+                                      'RequestId': properties.headers["RequestId"],
+                                      'ReturnMessageType': properties.headers["ReturnMessageType"]
+                                  }),
+                              body=body)
+        channel.basic_ack(delivery_tag=method.delivery_tag)
 
     def _on_request(self, channel: pika.adapters.blocking_connection.BlockingChannel, method: pika.spec.Basic.Deliver,
                     properties: pika.BasicProperties, body: bytes):
@@ -92,25 +98,22 @@ class MQConsumer:
         Pass the request to the worker and return its response.
         """
         t1 = time()
-        mq_item = MQItem(method.delivery_tag,
-                         properties.reply_to,
-                         properties.correlation_id,
-                         json.loads(body))
-        LOGGER.info(f"Received request: {{id: {mq_item.correlation_id}, size: {getsizeof(body)} bytes}}")
+        LOGGER.info(f"Received request: {{id: {properties.correlation_id}, size: {getsizeof(body)} bytes}}")
         try:
-            request = RequestSchema().load(mq_item.request)
+            request = json.loads(body)
+            request = RequestSchema().load(request)
             request = Request(**request)
             response = self.worker.process_request(request)
         except ValidationError as error:
             response = Response(status=f'Error parsing input: {error.messages}', status_code=400)
         except Exception as e:
             LOGGER.error(e)
-            response = Response(status_code=500, status="Unknown internal error during translation.")
+            response = Response(status_code=500, status="Unknown internal error.")
 
         respose_size = getsizeof(response)
 
-        self._respond(channel, mq_item, response.encode())
+        self._respond(channel, method, properties, response.encode())
         t2 = time()
 
-        LOGGER.info(f"Request processed: {{id: {mq_item.correlation_id}, duration: {round(t2 - t1, 3)} s, "
+        LOGGER.info(f"Request processed: {{id: {properties.correlation_id}, duration: {round(t2 - t1, 3)} s, "
                     f"size: {respose_size} bytes}}")

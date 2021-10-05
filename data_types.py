@@ -4,17 +4,6 @@ from marshmallow import Schema, fields, validate
 from typing import Optional, Union
 
 
-@dataclass
-class MQItem:
-    """
-    Parameters of a request sent via RabbitMQ.
-    """
-    delivery_tag: Optional[int]
-    reply_to: Optional[str]
-    correlation_id: Optional[str]
-    request: dict
-
-
 class RequestSchema(Schema):
     text = fields.Raw(required=True, validate=(
         lambda obj: type(obj) == str or (type(obj) == list and all(type(item) == str for item in obj))),

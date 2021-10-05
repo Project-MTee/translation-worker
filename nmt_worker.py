@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from nltk import sent_tokenize
-from helpers import Response, Request
+from data_types import Response, Request
 
 import settings
 from tag_utils import preprocess_tags, postprocess_tags
