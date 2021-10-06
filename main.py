@@ -22,17 +22,16 @@ if __name__ == "__main__":
         config = yaml.load(f, Loader=SafeLoader)
 
     exchange_name = 'translation'
-    WORKER_PARAMETERS = config['parameters']
 
-    ROUTING_KEYS = []  # routing key format: exchange_name.src.tgt.domain.input_type
+    routing_keys = []  # routing key format: exchange_name.src.tgt.domain.input_type
     for language_pair in config['language_pairs']:
         for domain in config['domains']:
             for input_type, allowed in config['input_types'].items():
                 if allowed:
                     key = f'{exchange_name}.{language_pair["source"]}.{language_pair["target"]}.{domain}.{input_type}'
-                    ROUTING_KEYS.append(key)
+                    routing_keys.append(key)
 
-    MQ_PARAMETERS = ConnectionParameters(host=environ.get('MQ_HOST', 'localhost'),
+    mq_parameters = ConnectionParameters(host=environ.get('MQ_HOST', 'localhost'),
                                          port=int(environ.get('MQ_PORT', '5672')),
                                          credentials=credentials.PlainCredentials(
                                              username=environ.get('MQ_USERNAME', 'guest'),
@@ -40,8 +39,8 @@ if __name__ == "__main__":
 
     translator = Translator(**config['parameters'])
     worker = MQConsumer(translator=translator,
-                        connection_parameters=MQ_PARAMETERS,
+                        connection_parameters=mq_parameters,
                         exchange_name=exchange_name,
-                        routing_keys=ROUTING_KEYS)
+                        routing_keys=routing_keys)
 
     worker.start()
