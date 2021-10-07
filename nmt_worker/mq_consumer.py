@@ -108,7 +108,7 @@ class MQConsumer:
         except ValidationError as error:
             response = Response(status=f'Error parsing input: {error.messages}', status_code=400)
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(f'Unexpected error: {e}')
             response = Response(status_code=500, status="Unknown internal error.")
 
         respose_size = getsizeof(response)

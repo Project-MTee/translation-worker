@@ -29,14 +29,17 @@ class Translator:
         """
         delimiters = []
         sentences = [sent.strip() for sent in sent_tokenize(text)]
-        try:
-            for sentence in sentences:
-                idx = text.index(sentence)
-                delimiters.append(text[:idx])
-                text = text[idx + len(sentence):]
-            delimiters.append(text)
-        except ValueError:
-            delimiters = ['', *[' ' for _ in range(len(sentences) - 1)], '']
+        if len(sentences) == 0:
+            return [''], ['']
+        else:
+            try:
+                for sentence in sentences:
+                    idx = text.index(sentence)
+                    delimiters.append(text[:idx])
+                    text = text[idx + len(sentence):]
+                delimiters.append(text)
+            except ValueError:
+                delimiters = ['', *[' ' for _ in range(len(sentences) - 1)], '']
 
         return sentences, delimiters
 
