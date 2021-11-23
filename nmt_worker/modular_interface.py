@@ -1,12 +1,14 @@
+import itertools
 import logging
 import copy
-from typing import Dict, List, Iterator, Any, Optional
+from collections import OrderedDict
+from typing import Dict, List, Iterator, Any, Optional, Tuple
 
 from fairseq.data import Dictionary, LanguagePairDataset, FairseqDataset
 from fairseq import utils, search, hub_utils
 from fairseq.models.multilingual_transformer import MultilingualTransformerModel
 from fairseq.tasks.multilingual_translation import MultilingualTranslationTask
-from fairseq.sequence_generator import SequenceGenerator
+from fairseq.sequence_generator import SequenceGenerator, SequenceGeneratorWithAlignment
 
 from omegaconf import open_dict, DictConfig
 
@@ -140,10 +142,13 @@ class ModularHubInterface(Module):
             max_sentences: Optional[int] = 10,
             max_tokens: Optional[int] = None,
             skip_invalid_size_inputs=False,
+            **kwargs
     ) -> List[List[Dict[str, Tensor]]]:
         gen_args = copy.deepcopy(self.cfg.generation)
         with open_dict(gen_args):
             gen_args.beam = beam
+            for k, v in kwargs.items():
+                setattr(gen_args, k, v)
         generator = self._build_generator(src_lang, tgt_lang, gen_args)
 
         results = []
@@ -207,6 +212,96 @@ class ModularHubInterface(Module):
         return SequenceGenerator(
             ModuleList([model.models[f"{src_lang}-{tgt_lang}"] for model in self.models]),
             self.dicts[tgt_lang],
+            beam_size=getattr(args, "beam", 5),
+            max_len_a=getattr(args, "max_len_a", 0),
+            max_len_b=getattr(args, "max_len_b", 200),
+            min_len=getattr(args, "min_len", 1),
+            normalize_scores=(not getattr(args, "unnormalized", False)),
+            len_penalty=getattr(args, "lenpen", 1),
+            unk_penalty=getattr(args, "unkpen", 0),
+            temperature=getattr(args, "temperature", 1.0),
+            match_source_len=getattr(args, "match_source_len", False),
+            no_repeat_ngram_size=getattr(args, "no_repeat_ngram_size", 0),
+            search_strategy=search.BeamSearch(self.dicts[tgt_lang]),
+        )
+
+
+class ModularHubInterfaceWithAlignment(ModularHubInterface):
+    def __init__(
+            self,
+            models: List[MultilingualTransformerModel],
+            task: MultilingualTranslationTask,
+            cfg: DictConfig,
+            sp_models: Dict[str, SentencePieceProcessor]
+    ):
+        from fairseq.models.multilingual_transformer_align import MultilingualTransformerAlignModel
+        if not all(isinstance(model, MultilingualTransformerAlignModel) for model in models):
+            raise ValueError(f"All models must be instances of {MultilingualTransformerAlignModel.__name__}")
+
+        super().__init__(models, task, cfg, sp_models)
+
+    @staticmethod
+    def bpe_to_word_alignment(src_bpe_sent: str, tgt_bpe_sent: str, bpe_alignment: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+        def bpe_to_word_map(sentence):
+            return [x - 1 for x in itertools.accumulate([int("\u2581" in x) for x in sentence.split()])]
+
+        src_map = bpe_to_word_map(src_bpe_sent)
+        tgt_map = bpe_to_word_map(tgt_bpe_sent)
+
+        return list(OrderedDict.fromkeys((src_map[a], tgt_map[b]) for a, b in bpe_alignment))
+
+    def translate_align(
+            self,
+            sentences: List[str],
+            src_language: str,
+            tgt_language: str,
+            alignment: str = "hard_shifted",
+            beam: int = 5,
+            max_sentences: Optional[int] = 10,
+            max_tokens: Optional[int] = 1000,
+    ) -> Tuple[List[str], List[List[Tuple[int, int]]]]:
+        """
+        :param sentences: list of sentences to be translated
+        :param src_language: source language
+        :param tgt_language: target language
+        :param alignment: method for generating alignments (recommended values are "hard" or "hard_shifted")
+        :param beam: beam size for the beam search algorithm (decoding)
+        :param max_sentences: max number of sentences in each batch
+        :param max_tokens: max number of tokens in each batch, all sentences must be shorter than max_tokens.
+        :return: list of translations corresponding to the input sentences and list of word alignments (src_idx, tgt_idx)
+        """
+        logger.debug(f"Translating from {src_language} to {tgt_language}")
+
+        src_bpe_sents = [self.apply_bpe(sentence, src_language) for sentence in sentences]
+
+        batched_hypos = self._generate(
+            [self.binarize(sentence, src_language) for sentence in src_bpe_sents],
+            src_language,
+            tgt_language,
+            beam=beam,
+            max_sentences=max_sentences,
+            max_tokens=max_tokens,
+            print_alignment=alignment
+        )
+
+        tgt_bpe_sents = [self.string(hypos[0]["tokens"], tgt_language) for hypos in batched_hypos]
+        alignments = [hypos[0]["alignment"] for hypos in batched_hypos]
+
+        return (
+            [self.remove_bpe(tgt_sent) for tgt_sent in tgt_bpe_sents],
+            [self.bpe_to_word_alignment(src, tgt, align) for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)]
+        )
+
+
+    def _build_generator(self, src_lang, tgt_lang, args):
+        print_alignment = getattr(args, "print_alignment", "hard_shifted")
+        if print_alignment is None:
+            return super()._build_generator(src_lang, tgt_lang, args)
+
+        return SequenceGeneratorWithAlignment(
+            ModuleList([model.models[f"{src_lang}-{tgt_lang}"] for model in self.models]),
+            self.dicts[tgt_lang],
+            print_alignment=print_alignment,
             beam_size=getattr(args, "beam", 5),
             max_len_a=getattr(args, "max_len_a", 0),
             max_len_b=getattr(args, "max_len_b", 200),
