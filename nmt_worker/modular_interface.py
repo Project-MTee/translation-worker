@@ -1,8 +1,9 @@
+from __future__ import annotations
 import itertools
 import logging
 import copy
 from collections import OrderedDict
-from typing import Dict, List, Iterator, Any, Optional, Tuple
+from typing import Dict, List, Iterator, Any, Optional, Tuple, Iterable, Set, Union
 
 from fairseq.data import Dictionary, LanguagePairDataset, FairseqDataset
 from fairseq import utils, search, hub_utils
@@ -152,7 +153,7 @@ class ModularHubInterface(Module):
             max_tokens: Optional[int] = None,
             skip_invalid_size_inputs=False,
             **kwargs
-    ) -> List[List[Dict[str, Tensor]]]:
+    ) -> List[List[Dict[str, Union[Tensor, List]]]]:
         gen_args = copy.deepcopy(self.cfg.generation)
         with open_dict(gen_args):
             gen_args.beam = beam
@@ -286,15 +287,26 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
 
     @staticmethod
     def bpe_to_word_alignment(
-            src_bpe_sent: str, tgt_bpe_sent: str, bpe_alignment: List[Tuple[int, int]]
+            src_bpe_sent: str, tgt_bpe_sent: str,
+            bpe_alignment: List[Tuple[int, int]],
+            alignment_ignore_tokens: Set[str]
     ) -> List[Tuple[int, int]]:
-        def bpe_to_word_map(sentence):
-            return [x - 1 for x in itertools.accumulate([int("\u2581" in x) for x in sentence.split()])]
+        def bpe_to_word_map(tokens):
+            return [x - 1 for x in itertools.accumulate([int("\u2581" in x) for x in tokens])]
 
-        src_map = bpe_to_word_map(src_bpe_sent)
-        tgt_map = bpe_to_word_map(tgt_bpe_sent)
+        src_tokens = src_bpe_sent.split(" ")
+        tgt_tokens = tgt_bpe_sent.split(" ")
 
-        return list(OrderedDict.fromkeys((src_map[a], tgt_map[b]) for a, b in bpe_alignment))
+        src_map = bpe_to_word_map(src_tokens)
+        tgt_map = bpe_to_word_map(tgt_tokens)
+
+        word_alignments = (
+            (src_map[a], tgt_map[b]) for a, b in bpe_alignment
+            if src_tokens[a] not in alignment_ignore_tokens and tgt_tokens[b] not in alignment_ignore_tokens
+        )
+
+        # removing duplicates
+        return list(OrderedDict.fromkeys(word_alignments))
 
     def translate_align(
             self,
@@ -305,6 +317,7 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
             beam: int = 5,
             max_sentences: Optional[int] = 10,
             max_tokens: Optional[int] = 1000,
+            alignment_ignore_tokens: Iterable[str] = tuple()
     ) -> Tuple[List[str], List[List[Tuple[int, int]]]]:
         """
         :param sentences: list of sentences to be translated
@@ -336,7 +349,7 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
         return (
             [self.remove_bpe(tgt_sent) for tgt_sent in tgt_bpe_sents],
             [
-                self.bpe_to_word_alignment(src, tgt, align)
+                self.bpe_to_word_alignment(src, tgt, align, set(alignment_ignore_tokens))
                 for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)
             ]
         )
