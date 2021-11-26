@@ -53,13 +53,22 @@ class ModularHubInterface(Module):
             model_path: str,
             sentencepiece_prefix: str,
             dictionary_path: str,
-    ):
+            override_args: Optional[Dict[str, Any]] = None
+    ) -> ModularHubInterface:
+        """
+        @param model_path: path to the model checkpoint file
+        @param sentencepiece_prefix: prefix so that the sp model is located at {sentencepiece_prefix}.{lang}.model
+        @param dictionary_path: path to the directory with dict.{lang}.txt files
+        @param override_args: model state arguments to override
+        @return: ModularHubInterface instance
+        """
         x = hub_utils.from_pretrained(
             "./",
             checkpoint_file=model_path,
             archive_map={},
             data_name_or_path=dictionary_path,
-            task="multilingual_translation"
+            task="multilingual_translation",
+            **({} if override_args is None else override_args)
         )
 
         sp_models = {
@@ -240,8 +249,45 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
 
         super().__init__(models, task, cfg, sp_models)
 
+    @classmethod
+    def from_pretrained_multilingual_transformer(
+            cls,
+            model_path: str,
+            sentencepiece_prefix: str,
+            dictionary_path: str,
+            alignment_heads=8,
+            alignment_layer=2,
+            full_context_alignment=False
+    ) -> ModularHubInterfaceWithAlignment:
+        """
+        Loads the MultilingualTransformer model as MultilingualTransformerAlign and adds alignment parameters.
+
+        @param model_path: path to the model checkpoint file
+        @param sentencepiece_prefix: prefix so that the sp model is located at {sentencepiece_prefix}.{lang}.model
+        @param dictionary_path: path to the directory with dict.{lang}.txt files
+        @param override_args: model state arguments to override
+        @param alignment_heads: the number of heads to use for the alignment
+        @param alignment_layer: layer to extract alignments from (indexing from 0)
+        @param full_context_alignment: use the full context (without triangular mask) for alignments
+        @return: ModularHubInterfaceWithAlignment instance
+        """
+        return cls.from_pretrained(
+            model_path,
+            sentencepiece_prefix,
+            dictionary_path,
+            override_args={
+                "arch": "multilingual_transformer_align",
+                "alignment_heads": alignment_heads,
+                "alignment_layer": alignment_layer,
+                "full_context_alignment": full_context_alignment,
+                "_name": None
+            }
+        )
+
     @staticmethod
-    def bpe_to_word_alignment(src_bpe_sent: str, tgt_bpe_sent: str, bpe_alignment: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+    def bpe_to_word_alignment(
+            src_bpe_sent: str, tgt_bpe_sent: str, bpe_alignment: List[Tuple[int, int]]
+    ) -> List[Tuple[int, int]]:
         def bpe_to_word_map(sentence):
             return [x - 1 for x in itertools.accumulate([int("\u2581" in x) for x in sentence.split()])]
 
@@ -289,9 +335,11 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
 
         return (
             [self.remove_bpe(tgt_sent) for tgt_sent in tgt_bpe_sents],
-            [self.bpe_to_word_alignment(src, tgt, align) for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)]
+            [
+                self.bpe_to_word_alignment(src, tgt, align)
+                for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)
+            ]
         )
-
 
     def _build_generator(self, src_lang, tgt_lang, args):
         print_alignment = getattr(args, "print_alignment", "hard_shifted")
