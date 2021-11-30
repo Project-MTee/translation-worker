@@ -3,6 +3,7 @@
 A component that runs a machine translation engine to process incoming translation requests.
 
 TODO: model description & reference to training code.
+TODO: install import nltk; nltk.download("punkt");
 
 ## Setup
 
