@@ -3,15 +3,17 @@ channels:
   - anaconda
   - conda-forge
 dependencies:
-  - python=3.7.5
-  - nltk==3.4.5
-  - marshmallow==3.13.0
-  - pytorch==1.8.1
+  - python==3.9.7
+  - nltk==3.5
+  - marshmallow==3.8.0
+  - pytorch==1.10.0
+  - torchvision==0.11.1
+  - torchaudio==0.10.0
+  - cpuonly==2.0
   - pyyaml==5.3.1
-  - numpy==1.20.3
   - pika==1.2.0
   - git
   - pip
   - pip:
-      - git+https://github.com/pytorch/fairseq.git@d6855baec88f99ac776962027b91d404fe917eea
+      - git+https://github.com/TartuNLP/fairseq.git@mtee-0.1.0
       - sentencepiece
