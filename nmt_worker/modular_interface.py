@@ -287,7 +287,8 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
 
     @staticmethod
     def bpe_to_word_alignment(
-            src_bpe_sent: str, tgt_bpe_sent: str,
+            src_bpe_sent: str,
+            tgt_bpe_sent: str,
             bpe_alignment: List[Tuple[int, int]],
             alignment_ignore_tokens: Set[str]
     ) -> List[Tuple[int, int]]:
@@ -317,6 +318,51 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
             self.dicts[tgt_lang].unk_string()
         )
 
+    def translate_align_bpe(
+            self,
+            bpe_sentences: List[str],
+            src_language: str,
+            tgt_language: str,
+            alignment: str = "hard_shifted",
+            beam: int = 5,
+            max_sentences: Optional[int] = 10,
+            max_tokens: Optional[int] = 1000,
+            replace_unks: bool = False
+    ) -> Tuple[List[str], List[List[Tuple[int, int]]]]:
+        """
+        :param bpe_sentences: list of bpe encoded sentences to be translated
+        :param src_language: source language
+        :param tgt_language: target language
+        :param alignment: method for generating alignments (recommended values are "hard" or "hard_shifted")
+        :param beam: beam size for the beam search algorithm (decoding)
+        :param max_sentences: max number of sentences in each batch
+        :param max_tokens: max number of tokens in each batch, all sentences must be shorter than max_tokens.
+        :param replace_unks: replace <unk>-s with the aligned src token.
+        :return: list of bpe translations corresponding to the input sentences and list of alignments (src_idx, tgt_idx)
+        """
+        logger.debug(f"Translating from {src_language} to {tgt_language}")
+
+        batched_hypos = self._generate(
+            [self.binarize(sentence, src_language) for sentence in bpe_sentences],
+            src_language,
+            tgt_language,
+            beam=beam,
+            max_sentences=max_sentences,
+            max_tokens=max_tokens,
+            print_alignment=alignment
+        )
+
+        tgt_bpe_sents = [self.string(hypos[0]["tokens"], tgt_language) for hypos in batched_hypos]
+        alignments = [hypos[0]["alignment"] for hypos in batched_hypos]
+
+        if replace_unks:
+            tgt_bpe_sents = [
+                self._replace_unks_with_alignment(src, tgt, align, tgt_language)
+                for src, tgt, align in zip(bpe_sentences, tgt_bpe_sents, alignments)
+            ]
+
+        return tgt_bpe_sents, alignments
+
     def translate_align(
             self,
             sentences: List[str],
@@ -341,36 +387,26 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
         :param replace_unks: replace <unk>-s with the aligned src token.
         :return: list of translations corresponding to the input sentences and list of word alignments (src_idx, tgt_idx)
         """
-        logger.debug(f"Translating from {src_language} to {tgt_language}")
-
         src_bpe_sents = [self.apply_bpe(sentence, src_language) for sentence in sentences]
 
-        batched_hypos = self._generate(
-            [self.binarize(sentence, src_language) for sentence in src_bpe_sents],
-            src_language,
-            tgt_language,
+        tgt_bpe_sents, alignments = self.translate_align_bpe(
+            src_bpe_sents,
+            src_language=src_language,
+            tgt_language=tgt_language,
+            alignment=alignment,
             beam=beam,
             max_sentences=max_sentences,
             max_tokens=max_tokens,
-            print_alignment=alignment
+            replace_unks=replace_unks
         )
 
-        tgt_bpe_sents = [self.string(hypos[0]["tokens"], tgt_language) for hypos in batched_hypos]
-        alignments = [hypos[0]["alignment"] for hypos in batched_hypos]
+        tgt_sents = [self.remove_bpe(tgt_sent) for tgt_sent in tgt_bpe_sents]
+        word_alignments = [
+            self.bpe_to_word_alignment(src, tgt, align, set(alignment_ignore_tokens))
+            for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)
+        ]
 
-        if replace_unks:
-            tgt_bpe_sents = [
-                self._replace_unks_with_alignment(src, tgt, align, tgt_language)
-                for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)
-            ]
-
-        return (
-            [self.remove_bpe(tgt_sent) for tgt_sent in tgt_bpe_sents],
-            [
-                self.bpe_to_word_alignment(src, tgt, align, set(alignment_ignore_tokens))
-                for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)
-            ]
-        )
+        return tgt_sents, word_alignments
 
     def _build_generator(self, src_lang, tgt_lang, args):
         print_alignment = getattr(args, "print_alignment", "hard_shifted")
