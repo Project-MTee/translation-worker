@@ -7,11 +7,11 @@ TODO: model description & reference to training code.
 ## Setup
 
 The worker can be used by running the prebuilt [docker image](ghcr.io/project-mtee/translation-worker). The `latest` 
-tag contains only the code, images with included models have a suffix with the pattern `<language-pair>.<domain>`, 
-for example `ru-et.general`, or `multilingual.<domain>` for multilingual models.
+tag contains only the code. Models can be attached to the container by mounting a volume at `models/` or by using the 
+images with included models, which have a suffix with the pattern `<language-pair>.<domain>`, for example 
+`ru-et.general`, or `multilingual.<domain>` for multilingual models.
 
-The container is designed to run in a CPU environment. For a manual setup, please refer to the included Dockerfile and
-the Conda environment specification described in `config/environment.yml`.
+The container is designed to run in a CPU environment. 
 
 The worker depends on the following components:
 - [RabbitMQ message broker](https://www.rabbitmq.com/)
@@ -22,9 +22,30 @@ The following environment variables should be specified when running the contain
 - `MQ_HOST` - RabbitMQ host
 - `MQ_PORT` (optional) - RabbitMQ port (`5672` by default)
 
+By default, the container entrypoint is `main.py` without additional arguments, but these can be defined with the 
+`COMMAND` option. For example by using `["--log-config", "config/logging.debug.ini"]` to enable debug logging.
+
+### Manual setup
+
+For a manual setup, please refer to the included Dockerfile and the environment specification described in 
+`config/requirements.txt`. Alternatively, the included `config/environment.yml` can be used to install the environment
+using Conda.
+
+To initialize the sentence splitting functionality, the following command should be run before starting the application:
+
+```python -c "import nltk; nltk.download(\"punkt\")"```
+
+RabbitMQ parameters should be configured with environment variables as described above. The worker can be started with:
+
+```python main.py [--worker-config config/config.yaml] [--log-config config/logging.ini]```
+
 ### Performance and Hardware Requirements
 
-TODO
+When deploying the worker in a CPU environment, the worker loads the NMT model into RAM. The exact usage depends on the 
+model and should be tested, but a conservative estimate is to have 3 GB of memory available.
+
+The performance is correlated with the CPU resources, for example, a single worker running on 32 vCPUs should be able to
+process 4-5 sentences per second.
 
 ### Request Format
 
