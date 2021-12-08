@@ -1,12 +1,15 @@
 import itertools
 import logging
 from typing import List
+import warnings
 
 from nltk import sent_tokenize
 from .utils import Response, Request
 from .tag_utils import preprocess_tags, postprocess_tags
 
 logger = logging.getLogger(__name__)
+
+warnings.filterwarnings('ignore', '.*__floordiv__*', )
 
 
 class Translator:
