@@ -10,6 +10,7 @@ from fairseq import utils, search, hub_utils
 from fairseq.models.multilingual_transformer import MultilingualTransformerModel
 from fairseq.tasks.multilingual_translation import MultilingualTranslationTask
 from fairseq.sequence_generator import SequenceGenerator, SequenceGeneratorWithAlignment
+from fairseq.utils import replace_unk
 
 from omegaconf import open_dict, DictConfig
 
@@ -266,7 +267,6 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
         @param model_path: path to the model checkpoint file
         @param sentencepiece_prefix: prefix so that the sp model is located at {sentencepiece_prefix}.{lang}.model
         @param dictionary_path: path to the directory with dict.{lang}.txt files
-        @param override_args: model state arguments to override
         @param alignment_heads: the number of heads to use for the alignment
         @param alignment_layer: layer to extract alignments from (indexing from 0)
         @param full_context_alignment: use the full context (without triangular mask) for alignments
@@ -308,6 +308,15 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
         # removing duplicates
         return list(OrderedDict.fromkeys(word_alignments))
 
+    def _replace_unks_with_alignment(self, src_bpe_sent, tgt_bpe_sent, alignments, tgt_lang):
+        return replace_unk(
+            tgt_bpe_sent,
+            src_bpe_sent,
+            [align[0] for align in alignments],
+            {},
+            self.dicts[tgt_lang].unk_string()
+        )
+
     def translate_align(
             self,
             sentences: List[str],
@@ -317,7 +326,8 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
             beam: int = 5,
             max_sentences: Optional[int] = 10,
             max_tokens: Optional[int] = 1000,
-            alignment_ignore_tokens: Iterable[str] = tuple()
+            alignment_ignore_tokens: Iterable[str] = tuple(),
+            replace_unks: bool = False
     ) -> Tuple[List[str], List[List[Tuple[int, int]]]]:
         """
         :param sentences: list of sentences to be translated
@@ -327,6 +337,8 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
         :param beam: beam size for the beam search algorithm (decoding)
         :param max_sentences: max number of sentences in each batch
         :param max_tokens: max number of tokens in each batch, all sentences must be shorter than max_tokens.
+        :param alignment_ignore_tokens: tokens to ignore when converting bpe alignments to word alignments.
+        :param replace_unks: replace <unk>-s with the aligned src token.
         :return: list of translations corresponding to the input sentences and list of word alignments (src_idx, tgt_idx)
         """
         logger.debug(f"Translating from {src_language} to {tgt_language}")
@@ -345,6 +357,12 @@ class ModularHubInterfaceWithAlignment(ModularHubInterface):
 
         tgt_bpe_sents = [self.string(hypos[0]["tokens"], tgt_language) for hypos in batched_hypos]
         alignments = [hypos[0]["alignment"] for hypos in batched_hypos]
+
+        if replace_unks:
+            tgt_bpe_sents = [
+                self._replace_unks_with_alignment(src, tgt, align, tgt_language)
+                for src, tgt, align in zip(src_bpe_sents, tgt_bpe_sents, alignments)
+            ]
 
         return (
             [self.remove_bpe(tgt_sent) for tgt_sent in tgt_bpe_sents],
