@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import List
+from typing import List, Tuple
 
 from nltk import sent_tokenize
 from .utils import Response, Request
@@ -12,10 +12,12 @@ logger = logging.getLogger("nmt_worker")
 class Translator:
     model = None
 
-    def __init__(self, modular: bool = False, **kwargs):
+    def __init__(self, modular: bool = False, with_alignment: bool = False, **kwargs):
         if modular:
-            self._load_modular_model(**kwargs)
+            self._load_modular_model(modular_with_alignment=with_alignment, **kwargs)
             self.translate = self._translate_modular
+            if with_alignment:
+                self.translate_align = self._translate_modular_with_align
         else:
             self._load_model(**kwargs)
             self.translate = self._translate
@@ -52,18 +54,30 @@ class Translator:
             sentencepiece_model=spm_model
         )
 
-    def _load_modular_model(self, checkpoint_path: str, spm_prefix: str):
-        from .modular_interface import ModularHubInterface
-        self.model = ModularHubInterface.from_pretrained(
-            model_path = f'{checkpoint_path}/checkpoint_best.pt',
-            sentencepiece_prefix = spm_prefix,
-            dictionary_path = checkpoint_path)
+    def _load_modular_model(self, checkpoint_path: str, spm_prefix: str, modular_with_alignment: bool):
+        if modular_with_alignment:
+            from .modular_interface import ModularHubInterfaceWithAlignment
+            self.model = ModularHubInterfaceWithAlignment.from_pretrained_multilingual_transformer(
+                model_path=f'{checkpoint_path}/checkpoint_best.pt',
+                sentencepiece_prefix=spm_prefix,
+                dictionary_path=checkpoint_path
+            )
+        else:
+            from .modular_interface import ModularHubInterface
+            self.model = ModularHubInterface.from_pretrained(
+                model_path=f'{checkpoint_path}/checkpoint_best.pt',
+                sentencepiece_prefix=spm_prefix,
+                dictionary_path=checkpoint_path)
 
     def _translate(self, sentences: List[str], **_) -> List[str]:
         return self.model.translate(sentences)
 
     def _translate_modular(self, sentences: List[str], src: str, tgt: str, **_) -> List[str]:
         return self.model.translate(sentences, src_language=src, tgt_language=tgt)
+
+    def _translate_modular_with_align(self, sentences: List[str], src: str, tgt: str) \
+            -> Tuple[List[str], List[List[Tuple[int, int]]]]:
+        return self.model.translate_align(sentences, src_language=src, tgt_language=tgt)
 
     def process_request(self, request: Request) -> Response:
         inputs = [request.text] if type(request.text) == str else request.text
@@ -80,4 +94,3 @@ class Translator:
         response = Response(translation=translations[0] if type(request.text) == str else translations)
 
         return response
-
