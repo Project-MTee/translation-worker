@@ -6,7 +6,7 @@ from nltk import sent_tokenize
 from .utils import Response, Request
 from .tag_utils import preprocess_tags, postprocess_tags
 
-logger = logging.getLogger("nmt_worker")
+logger = logging.getLogger(__name__)
 
 
 class Translator:
@@ -55,9 +55,9 @@ class Translator:
     def _load_modular_model(self, checkpoint_path: str, spm_prefix: str):
         from .modular_interface import ModularHubInterface
         self.model = ModularHubInterface.from_pretrained(
-            model_path = f'{checkpoint_path}/checkpoint_best.pt',
-            sentencepiece_prefix = spm_prefix,
-            dictionary_path = checkpoint_path)
+            model_path=f'{checkpoint_path}/checkpoint_best.pt',
+            sentencepiece_prefix=spm_prefix,
+            dictionary_path=checkpoint_path)
 
     def _translate(self, sentences: List[str], **_) -> List[str]:
         return self.model.translate(sentences)
@@ -80,4 +80,3 @@ class Translator:
         response = Response(translation=translations[0] if type(request.text) == str else translations)
 
         return response
-
