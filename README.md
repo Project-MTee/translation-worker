@@ -1,35 +1,62 @@
 # Translation Worker
 
-A component that runs a machine translation engine to process incoming translation requests.
-
-TODO: model description & reference to training code.
+A component that runs a FairSeq machine translation engine to process incoming translation requests via RabbitMQ. This
+code is compatible with standard single-direction baseline models as well as modular multilingual models. For more
+information, please refer to the [model training scripts](https://github.com/Project-MTee/model_training) and the 
+[custom FairSeq fork](https://github.com/TartuNLP/fairseq/releases/tag/mtee-0.1.0) used in this project.
 
 ## Setup
 
-The worker can be used by running the prebuilt [docker image](ghcr.io/project-mtee/translation-worker). The `latest` 
-tag contains only the code, images with included models have a suffix with the pattern `<language-pair>.<domain>`, 
-for example `ru-et.general`, or `multilingual.<domain>` for multilingual models.
+There are two separate docker images published alongside this repository: 
+- [`translation-worker`](https://ghcr.io/project-mtee/translation-worker) (documented below)
+- [`translation-model`](https://ghcr.io/project-mtee/translation-worker)
+(documented in [`models/README.md`](https://github.com/project-mtee/translation-worker/models)).
 
-The container is designed to run in a CPU environment. For a manual setup, please refer to the included Dockerfile and
-the Conda environment specification described in `config/environment.yml`.
+The translation worker can be set up using the [`translation-worker`](https://ghcr.io/project-mtee/translation-worker). 
+This image contains only the environment setup and code to run the models, and is designed to be used in a CPU 
+environment.
 
-The worker depends on the following components:
-- [RabbitMQ message broker](https://www.rabbitmq.com/)
+The models must be attached to the container by mounting a volume at `/app/models/` as described in 
+[`models/README.md`](https://github.com/project-mtee/translation-worker/models).
 
-The following environment variables should be specified when running the container:
+The worker requires a connection to a [RabbitMQ message broker](https://www.rabbitmq.com/). The connection must be 
+configured using the following environment variables:
 - `MQ_USERNAME` - RabbitMQ username
 - `MQ_PASSWORD` - RabbitMQ user password
 - `MQ_HOST` - RabbitMQ host
 - `MQ_PORT` (optional) - RabbitMQ port (`5672` by default)
 
+By default, the container entrypoint is `main.py` without additional arguments, but these can be defined with the 
+`COMMAND` option. For example by using `["--log-config", "logging/debug.ini"]` to enable debug level logging.
+
+### Manual setup
+
+For a manual setup, please refer to the included Dockerfile and the environment specification described in 
+`requirements/requirements.txt`. Alternatively, the included `requirements/environment.yml` can be used to install the 
+requirements using Conda. Additionally, [`models/README.md`](https://github.com/project-mtee/translation-worker/models) 
+describes how models should be set up correctly.
+
+To initialize the sentence splitting functionality, the following command should be run before starting the application:
+
+```python -c "import nltk; nltk.download(\"punkt\")"```
+
+RabbitMQ parameters should be configured with environment variables as described above. The worker can be started with:
+
+```python main.py [--worker-config models/config.yaml] [--log-config logging/logging.ini]```
+
 ### Performance and Hardware Requirements
 
-TODO
+The worker loads the NMT model into memory. The exact RAM usage depends on the model and should always be tested, but a 
+conservative estimate is to have 3 GB of memory available (tested with a modular model with 4 input and 4 output 
+languages).
 
-### Request Format
+The performance is correlated with the available CPU resources, for example, a single worker running on 32 vCPUs should 
+be able to process 4-5 sentences per second.
+
+## Request Format
 
 The worker consumes translation requests from a RabbitMQ message broker and responds with the translated text. 
-The following format is compatible with the [text translation API](ghcr.io/project-mtee/text-translation-api).
+The following format is compatible with the [text translation API](https://ghcr.io/project-mtee/text-translation-api).
 
 Requests should be published with the following parameters:
 - Exchange name: `translation` (exchange type is `direct`)
