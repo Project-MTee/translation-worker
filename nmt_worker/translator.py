@@ -15,12 +15,13 @@ warnings.filterwarnings('ignore', '.*__floordiv__*', )
 class Translator:
     model = None
 
-    def __init__(self, modular: bool = False, **kwargs):
+    def __init__(self, modular: bool,
+                 checkpoint_path: str, dict_dir: str, sentencepiece_dir, sentencepiece_prefix: str):
         if modular:
-            self._load_modular_model(**kwargs)
+            self._load_modular_model(checkpoint_path, dict_dir, sentencepiece_dir, sentencepiece_prefix)
             self.translate = self._translate_modular
         else:
-            self._load_model(**kwargs)
+            self._load_model(checkpoint_path, dict_dir, sentencepiece_dir, sentencepiece_prefix)
             self.translate = self._translate
         logger.info("All NMT models loaded")
 
@@ -46,21 +47,25 @@ class Translator:
 
         return sentences, delimiters
 
-    def _load_model(self, checkpoint_path: str, spm_model: str):
+    def _load_model(self, checkpoint_path: str, dict_dir: str, sentencepiece_dir, sentencepiece_prefix: str):
         from fairseq.models.transformer import TransformerModel
+        sentencepiece_dir = sentencepiece_dir.rstrip('/')
         self.model = TransformerModel.from_pretrained(
-            checkpoint_path,
-            checkpoint_file='checkpoint_best.pt',
+            "./",
+            checkpoint_file=checkpoint_path,
             bpe='sentencepiece',
-            sentencepiece_model=spm_model
+            sentencepiece_model=f"{sentencepiece_dir}/{sentencepiece_prefix}.model",
+            data_name_or_path=dict_dir
         )
 
-    def _load_modular_model(self, checkpoint_path: str, spm_prefix: str):
+    def _load_modular_model(self, checkpoint_path: str, dict_dir: str, sentencepiece_dir: str,
+                            sentencepiece_prefix: str):
         from .modular_interface import ModularHubInterface
+        sentencepiece_dir = sentencepiece_dir.rstrip('/')
         self.model = ModularHubInterface.from_pretrained(
-            model_path=f'{checkpoint_path}/checkpoint_best.pt',
-            sentencepiece_prefix=spm_prefix,
-            dictionary_path=checkpoint_path)
+            model_path=checkpoint_path,
+            sentencepiece_prefix=f"{sentencepiece_dir}/{sentencepiece_prefix}",
+            dictionary_path=dict_dir)
 
     def _translate(self, sentences: List[str], **_) -> List[str]:
         return self.model.translate(sentences)

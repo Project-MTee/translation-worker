@@ -8,12 +8,14 @@ from pika import ConnectionParameters, credentials
 from nmt_worker.mq_consumer import MQConsumer
 from nmt_worker.translator import Translator
 
+input_types = ["plain", "document", "web", "asr"]
+
 if __name__ == "__main__":
 
     parser = ArgumentParser()
-    parser.add_argument('--worker-config', type=FileType('r'), default='config/config.yaml',
+    parser.add_argument('--worker-config', type=FileType('r'), default='models/config.yaml',
                         help="The worker config YAML file to load.")
-    parser.add_argument('--log-config', type=FileType('r'), default='config/logging.ini',
+    parser.add_argument('--log-config', type=FileType('r'), default='logging/logging.ini',
                         help="Path to log config file.")
     args = parser.parse_known_args()[0]
     logging.config.fileConfig(args.log_config.name)
@@ -25,11 +27,11 @@ if __name__ == "__main__":
 
     routing_keys = []  # routing key format: exchange_name.src.tgt.domain.input_type
     for language_pair in config['language_pairs']:
+        source, target = language_pair.split('-')
         for domain in config['domains']:
-            for input_type, allowed in config['input_types'].items():
-                if allowed:
-                    key = f'{exchange_name}.{language_pair["source"]}.{language_pair["target"]}.{domain}.{input_type}'
-                    routing_keys.append(key)
+            for input_type in input_types:
+                key = f'{exchange_name}.{source}.{target}.{domain}.{input_type}'
+                routing_keys.append(key)
 
     mq_parameters = ConnectionParameters(host=environ.get('MQ_HOST', 'localhost'),
                                          port=int(environ.get('MQ_PORT', '5672')),
@@ -37,7 +39,13 @@ if __name__ == "__main__":
                                              username=environ.get('MQ_USERNAME', 'guest'),
                                              password=environ.get('MQ_PASSWORD', 'guest')))
 
-    translator = Translator(**config['parameters'])
+    translator = Translator(
+        config['modular'],
+        config['checkpoint'],
+        config['dict_dir'],
+        config['sentencepiece_dir'],
+        config['sentencepiece_prefix'],
+    )
     worker = MQConsumer(translator=translator,
                         connection_parameters=mq_parameters,
                         exchange_name=exchange_name,

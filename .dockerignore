@@ -6,4 +6,3 @@ __pycache__/
 Dockerfile
 LICENSE
 README.md
-config/sample.config.yaml
