@@ -14,7 +14,7 @@ REGEXES = (
 
     # remove unnnecessary spaces
     (re.compile(r'(\d) %'), r'\1%'),
-    (re.compile(r' \([:;?!]\)'), r'\1'),
+    (re.compile(r' ([:;?!])'), r'\1'),
 
     # normalize quotation marks, apostrophes and hyphens
     (re.compile(r'[`´′‘‚’]'), r"'"),
