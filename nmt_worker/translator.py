@@ -6,6 +6,7 @@ import warnings
 from nltk import sent_tokenize
 from .utils import Response, Request
 from .tag_utils import preprocess_tags, postprocess_tags
+from .normalization import normalize
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +81,9 @@ class Translator:
         for text in inputs:
             sentences, delimiters = self._sentence_tokenize(text)
             detagged, tags = preprocess_tags(sentences, request.input_type)
-            translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(
-                self.translate(detagged, src=request.src, tgt=request.tgt, domain=request.domain))]
+            normalized = [normalize(sentence) for sentence in detagged]
+            translated = [translation if normalized[idx] != '' else '' for idx, translation in enumerate(
+                self.translate(normalized, src=request.src, tgt=request.tgt, domain=request.domain))]
             retagged = postprocess_tags(translated, tags, request.input_type)
             translations.append(''.join(itertools.chain.from_iterable(zip(delimiters, retagged))) + delimiters[-1])
 

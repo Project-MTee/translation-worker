@@ -3,64 +3,36 @@ import re
 
 # define and compile all the patterns
 REGEXES = (
+    # whitespace character normalization
+    (re.compile(r' '), ' '),
     (re.compile(r'\r'), r''),
 
-    # remove extra spaces
-    (re.compile(r'\('), r' ('),
-    (re.compile(r'\)'), r') '),
-    (re.compile(r' +'), r' '),
+    # parenthesis
+    (re.compile(r' *\( *'), r' ('),
+    (re.compile(r' *\) *'), r') '),
     (re.compile(r'\) ([.!:?;,])'), r')\1'),
-    (re.compile(r'\( '), r'('),
-    (re.compile(r' \)'), r')'),
-    (re.compile(r'(\d) %'), r'\1%'),
-    (re.compile(r' :'), ':'),
-    (re.compile(r' ;'), ';'),
-    # normalize unicode punctuation
-    (re.compile(r'`'), r"'"),
-    (re.compile(r"''"), r' " '),
 
-    (re.compile(r'„'), r'"'),
-    (re.compile(r'“'), r'"'),
-    (re.compile(r'”'), r'"'),
-    (re.compile(r'­'), r''),
-    (re.compile(r'–'), r'-'),
-    (re.compile(r'‐'), r'-'),
-    (re.compile(r'‒'), r'-'),
-    (re.compile(r'−'), r'-'),
-    (re.compile(r'—'), r' - '),
-    (re.compile(r' +'), r' '),
-    (re.compile(r'´'), r"'"),
-    (re.compile(r'([a-z])‘([a-z])', flags=re.IGNORECASE), r"\1'\2"),
-    (re.compile(r'([a-z])’([a-z])', flags=re.IGNORECASE), r"\1'\2"),
-    (re.compile(r'′'), r"'"),
-    (re.compile(r'‘'), r"'"),
-    (re.compile(r'‚'), r"'"),
-    (re.compile(r'’'), r"'"),
+    # remove unnnecessary spaces
+    (re.compile(r'(\d) %'), r'\1%'),
+    (re.compile(r' \([:;?!]\)'), r'\1'),
+
+    # normalize quotation marks, apostrophes and hyphens
+    (re.compile(r'[`´′‘‚’]'), r"'"),
     (re.compile(r"''"), r'"'),
-    (re.compile(r'´´'), r'"'),
+    (re.compile(r'[„“”«»]'), r'"'),
+    (re.compile(r'­'), r''),
+    (re.compile(r'[–‐‒−]'), r'-'),
+    (re.compile(r' *— *'), r' - '),
+
+    # various non-unicode characters
     (re.compile(r'…'), r'...'),
-    # French quotes
-    (re.compile(r' « '), r' "'),
-    (re.compile(r'« '), r'"'),
-    (re.compile(r'«'), r'"'),
-    (re.compile(r' » '), r'" '),
-    (re.compile(r' »'), r'"'),
-    (re.compile(r'»'), r'"'),
-    # handle pseudo-spaces
-    (re.compile(r' %'), r'%'),
-    (re.compile(r'nº '), r'nº '),
-    (re.compile(r' :'), r':'),
-    (re.compile(r' ºC'), r' ºC'),
-    (re.compile(r' cm'), r' cm'),
-    (re.compile(r' \?'), r'?'),
-    (re.compile(r' !'), r'!'),
-    (re.compile(r' ;'), r';'),
-    (re.compile(r', '), r', '),
+
+    # remove extra spaces
     (re.compile(r' +'), r' ')
 )
 
 
-def normalize(sentence: str, language_code: str = None):
+def normalize(sentence: str):
     for regex, sub in REGEXES:
         sentence = regex.sub(sub, sentence)
     return sentence
