@@ -9,17 +9,22 @@ class MTeeHTMLParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         self.tag_stack.append(tag)
-        self.tag_list.append((tag, attrs))
+        if len(attrs) > 0:
+            attr_dict = dict(attrs)
+            self.tag_list.append((tag, attr_dict['id']))
+        else:
+            self.tag_list.append((tag, ''))
 
     def handle_endtag(self, tag):
         self.tag_stack.pop()
-        self.tag_list.append(tag)
+        self.tag_list.append((tag, ''))
 
     def handle_startendtag(self, tag, attrs):
-        self.tag_list.append((tag, attrs))
-
-    #def handle_data(self, data):
-    #    print("Encountered some data  :", data)
+        if len(attrs) > 0:
+            attr_dict = dict(attrs)
+            self.tag_list.append((tag, attr_dict['id']))
+        else:
+            self.tag_list.append((tag, ''))
 
     def isHtml(self):
         return len(self.tag_stack) == 0
@@ -33,6 +38,9 @@ def validateHTML(source, translation):
         translationparser.feed('<html>' + translation + '</html>')
 
         separately_html = srcparser.isHtml() and translationparser.isHtml()
+        srcparser.tag_list.sort()
+        translationparser.tag_list.sort()
+
         return separately_html and (srcparser.tag_list == translationparser.tag_list)
     else:
         return False
@@ -43,15 +51,16 @@ def validateXML(source, translation):
             root1 = ET.fromstring('<xml>' + source + '</xml>')
         except ET.ParseError:
             return False
-            # raise Exception('Source segment is not valid XML')
         try:
             root2 = ET.fromstring('<xml>' + translation + '</xml>')
         except ET.ParseError:
             return False
-            #raise Exception('Translation segment is not valid XML')
 
-        tags1 = [(elem.tag, elem.attrib) for elem in root1.iter()]
-        tags2 = [(elem.tag, elem.attrib) for elem in root2.iter()]
+        tags1 = [(elem.tag, elem.attrib.get('id')) for elem in root1.iter()]
+        tags2 = [(elem.tag, elem.attrib.get('id')) for elem in root2.iter()]
+
+        tags1.sort()
+        tags2.sort()
 
         if tags1 == tags2:
             return True
