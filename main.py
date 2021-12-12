@@ -45,6 +45,7 @@ if __name__ == "__main__":
         config['dict_dir'],
         config['sentencepiece_dir'],
         config['sentencepiece_prefix'],
+        config["alignment"],
     )
     worker = MQConsumer(translator=translator,
                         connection_parameters=mq_parameters,

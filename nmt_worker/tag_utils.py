@@ -70,7 +70,7 @@ def preprocess_tags(sentences: List[str], input_type: str) -> (List[str], List[L
 def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, str]]], input_type: str):
     translations = [sentence.replace("<unk>", "") for sentence in translations]
 
-    if input_type in tag_patterns:
+    if input_type in tagged_input_types:
         for symbol, entity in html_entities.items():
             translations = [sentence.replace(symbol, entity) for sentence in translations]
 

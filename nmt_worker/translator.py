@@ -65,14 +65,19 @@ class Translator:
     def _load_modular_model(self, checkpoint_path: str, dict_dir: str, sentencepiece_dir: str,
                             sentencepiece_prefix: str, with_alignment: bool):
         if with_alignment:
-            from .modular_interface import ModularHubInterfaceWithAlignment as ModularModel
+            from .modular_interface import ModularHubInterfaceWithAlignment
+            sentencepiece_dir = sentencepiece_dir.rstrip('/')
+            self.model = ModularHubInterfaceWithAlignment.from_pretrained_multilingual_transformer(
+                model_path=checkpoint_path,
+                sentencepiece_prefix=f"{sentencepiece_dir}/{sentencepiece_prefix}",
+                dictionary_path=dict_dir)
         else:
-            from .modular_interface import ModularHubInterface as ModularModel
-        sentencepiece_dir = sentencepiece_dir.rstrip('/')
-        self.model = ModularModel.from_pretrained(
-            model_path=checkpoint_path,
-            sentencepiece_prefix=f"{sentencepiece_dir}/{sentencepiece_prefix}",
-            dictionary_path=dict_dir)
+            from .modular_interface import ModularHubInterface
+            sentencepiece_dir = sentencepiece_dir.rstrip('/')
+            self.model = ModularHubInterface.from_pretrained(
+                model_path=checkpoint_path,
+                sentencepiece_prefix=f"{sentencepiece_dir}/{sentencepiece_prefix}",
+                dictionary_path=dict_dir)
 
     def _translate(self, sentences: List[str], **_) -> List[str]:
         return self.model.translate(sentences)
