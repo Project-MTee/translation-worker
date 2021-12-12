@@ -1,12 +1,10 @@
 import itertools
 import logging
-from typing import List
 import warnings
 from typing import List, Tuple
 
 from nltk import sent_tokenize
 from .utils import Response, Request
-from .tag_utils import preprocess_tags, postprocess_tags
 from .normalization import normalize
 from .tag_utils import preprocess_tags, postprocess_tags, postprocess_tags_with_alignment
 
@@ -18,12 +16,11 @@ warnings.filterwarnings('ignore', '.*__floordiv__*', )
 class Translator:
     model = None
 
-    def __init__(self, modular: bool,
-                 checkpoint_path: str, dict_dir: str, sentencepiece_dir, sentencepiece_prefix: str
-        with_alignment: bool = False
-    ):
+    def __init__(self, modular: bool, checkpoint_path: str, dict_dir: str, sentencepiece_dir,
+                 sentencepiece_prefix: str, with_alignment: bool = False):
         if modular:
-            self._load_modular_model(checkpoint_path, dict_dir, sentencepiece_dir, sentencepiece_prefix, with_alignment=with_alignment)
+            self._load_modular_model(checkpoint_path, dict_dir, sentencepiece_dir, sentencepiece_prefix,
+                                     with_alignment=with_alignment)
             self.translate = self._translate_modular
             if with_alignment:
                 self.translate_align = self._translate_modular_with_align
@@ -85,7 +82,7 @@ class Translator:
 
     def _translate_modular_with_align(self, sentences: List[str], src: str, tgt: str, **_) \
             -> Tuple[List[str], List[List[Tuple[int, int]]]]:
-        return self.model.translate_align(sentences, src_language=src, tgt_language=tgt)
+        return self.model.translate_align(sentences, src_language=src, tgt_language=tgt, replace_unks=True)
 
     def process_request(self, request: Request) -> Response:
         inputs = [request.text] if type(request.text) == str else request.text
@@ -96,8 +93,10 @@ class Translator:
             detagged, tags = preprocess_tags(sentences, request.input_type)
             normalized = [normalize(sentence) for sentence in detagged]
             if len(tags[0]) > 1:
-                hyps_aligned, alignments = self.translate_align(normalized, src=request.src, tgt=request.tgt, domain=request.domain)
-                translated = [translation if normalized[idx] != '' else '' for idx, translation in enumerate(hyps_aligned)]
+                hyps_aligned, alignments = self.translate_align(normalized, src=request.src, tgt=request.tgt,
+                                                                domain=request.domain)
+                translated = [translation if normalized[idx] != '' else '' for idx, translation in
+                              enumerate(hyps_aligned)]
                 retagged = postprocess_tags_with_alignment(normalized, translated, tags, request.input_type, alignments)
                 translations.append(retagged)
             else:
