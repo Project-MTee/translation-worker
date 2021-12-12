@@ -1,6 +1,7 @@
 from html.parser import HTMLParser
 import xml.etree.ElementTree as ET
 
+
 class MTeeHTMLParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -18,11 +19,12 @@ class MTeeHTMLParser(HTMLParser):
     def handle_startendtag(self, tag, attrs):
         self.tag_list.append((tag, attrs))
 
-    #def handle_data(self, data):
+    # def handle_data(self, data):
     #    print("Encountered some data  :", data)
 
     def isHtml(self):
         return len(self.tag_stack) == 0
+
 
 def validateHTML(source, translation):
     if source != '' and translation != '':
@@ -37,6 +39,7 @@ def validateHTML(source, translation):
     else:
         return False
 
+
 def validateXML(source, translation):
     if source != '' and translation != '':
         try:
@@ -48,7 +51,7 @@ def validateXML(source, translation):
             root2 = ET.fromstring('<xml>' + translation + '</xml>')
         except ET.ParseError:
             return False
-            #raise Exception('Translation segment is not valid XML')
+            # raise Exception('Translation segment is not valid XML')
 
         tags1 = [(elem.tag, elem.attrib) for elem in root1.iter()]
         tags2 = [(elem.tag, elem.attrib) for elem in root2.iter()]
@@ -62,10 +65,10 @@ def validateXML(source, translation):
 
 
 def validate(source, translation, validationMode):
-    if validationMode != 'HTML':
+    if validationMode.lower() != 'html':
         if validateXML(source, translation):
             return True
-        elif validationMode != 'Auto':
+        elif validationMode.lower() != 'auto':
             return False
         else:
             return validateHTML(source, translation)

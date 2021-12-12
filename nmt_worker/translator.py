@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 from nltk import sent_tokenize
 from .utils import Response, Request
-from .tag_utils import preprocess_tags, postprocess_tags
+from .tag_utils import preprocess_tags, postprocess_tags, postprocess_tags_with_alignment
 
 logger = logging.getLogger("nmt_worker")
 
@@ -75,7 +75,7 @@ class Translator:
     def _translate_modular(self, sentences: List[str], src: str, tgt: str, **_) -> List[str]:
         return self.model.translate(sentences, src_language=src, tgt_language=tgt)
 
-    def _translate_modular_with_align(self, sentences: List[str], src: str, tgt: str) \
+    def _translate_modular_with_align(self, sentences: List[str], src: str, tgt: str, **_) \
             -> Tuple[List[str], List[List[Tuple[int, int]]]]:
         return self.model.translate_align(sentences, src_language=src, tgt_language=tgt)
 
@@ -86,10 +86,16 @@ class Translator:
         for text in inputs:
             sentences, delimiters = self._sentence_tokenize(text)
             detagged, tags = preprocess_tags(sentences, request.input_type)
-            translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(
-                self.translate(detagged, src=request.src, tgt=request.tgt, domain=request.domain))]
-            retagged = postprocess_tags(translated, tags, request.input_type)
-            translations.append(''.join(itertools.chain.from_iterable(zip(delimiters, retagged))) + delimiters[-1])
+            if len(tags[0]) > 1:
+                hyps_aligned, alignments = self.translate_align(detagged, src=request.src, tgt=request.tgt, domain=request.domain)
+                translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(hyps_aligned)]
+                retagged = postprocess_tags_with_alignment(detagged, translated, tags, request.input_type, alignments)
+                translations.append(retagged)
+            else:
+                translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(
+                    self.translate(detagged, src=request.src, tgt=request.tgt, domain=request.domain))]
+                retagged = postprocess_tags(translated, tags, request.input_type)
+                translations.append(''.join(itertools.chain.from_iterable(zip(delimiters, retagged))) + delimiters[-1])
 
         response = Response(translation=translations[0] if type(request.text) == str else translations)
 
