@@ -10,6 +10,7 @@ RUN apt-get update && \
         git
 
 ENV PYTHONIOENCODING=utf-8
+ENV MKL_NUM_THREADS=""
 
 WORKDIR /app
 VOLUME /app/models
