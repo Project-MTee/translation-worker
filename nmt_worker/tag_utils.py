@@ -99,122 +99,149 @@ def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, st
 
 def postprocess_tags_with_alignment(sources: List[str], translations: List[str], tags: List[List[Tuple[str, int, str]]],
                                     input_type: str, alignments: List[List[Tuple[int, int]]]):
-    if input_type in tagged_input_types:
-        for symbol, entity in html_entities.items():
-            translations = [sentence.replace(symbol, entity) for sentence in translations]
-    hyps_split = " ".join(translations).split()
-    max_al_ix_src = 0
-    max_al_ix_tgt = 0
-    aligns_extnd = []
-    tags_extnd = []
-    for snt_idx, (sent_alignments, sent_tags) in enumerate(zip(alignments, tags)):
-        for _align in sent_alignments:
-            aligns_extnd.append((_align[0] + max_al_ix_src, _align[1] + max_al_ix_tgt))
-        for tag in sent_tags:
-            if tag[1] == -1:
-                new_tag_idx = max_al_ix_src + len(sources[snt_idx].split())
-            else:
-                new_tag_idx = max_al_ix_src + tag[1]
-            tags_extnd.append((tag[0], new_tag_idx, tag[2]))
+    # Ideal case (Tags only in the beginning and the end
+    if set(i[1] for i in chain(*tags)) == {0, -1}:
+        return " ".join(postprocess_tags(translations, tags, input_type))
+    else:
+        if input_type in tagged_input_types:
+            for symbol, entity in html_entities.items():
+                translations = [sentence.replace(symbol, entity) for sentence in translations]
+        if len(translations) > 1:
+            hyps_split = " ".join(translations).split()
+            max_al_ix_src = 0
+            max_al_ix_tgt = 0
+            aligns_extnd = []
+            tags_extnd = []
+            for snt_idx, (sent_alignments, sent_tags) in enumerate(zip(alignments, tags)):
+                for _align in sent_alignments:
+                    aligns_extnd.append((_align[0] + max_al_ix_src, _align[1] + max_al_ix_tgt))
+                for tag in sent_tags:
+                    if tag[1] == -1:
+                        new_tag_idx = max_al_ix_src + len(sources[snt_idx].split())
+                    else:
+                        new_tag_idx = max_al_ix_src + tag[1]
+                    tags_extnd.append((tag[0], new_tag_idx, tag[2]))
 
-        max_al_ix_src = max(i[0] for i in aligns_extnd) + 1
-        max_al_ix_tgt = max(i[1] for i in aligns_extnd) + 1
-
-    try:
-        if input_type == "web":
-            retagged = _postproc_html_sent_with_alignment(hyps_split, tags_extnd, aligns_extnd)
-        elif input_type == "document":
-            raise NotImplementedError
+                max_al_ix_src = max(i[0] for i in aligns_extnd) + 1
+                max_al_ix_tgt = max(i[1] for i in aligns_extnd) + 1
         else:
-            raise NotImplementedError
-    except Exception as e:
-        print(f"EXCEPTION: {str(e)}")
-        retagged = postprocess_tags(translations, tags, input_type)
-    return retagged
+            hyps_split = translations[0].split()
+
+            aligns_extnd = alignments[0]
+            tags_extnd = []
+            for j in tags[0]:
+                new_jdx = j[1] if j[1] > -1 else len(sources[0].split())
+                tags_extnd.append((j[0], new_jdx, j[2]))
+
+        try:
+            if input_type == "document":
+                raise NotImplementedError
+            else:
+                return _postproc_html_sent_with_alignment(hyps_split, tags_extnd, aligns_extnd)
+        except Exception as e:
+            print(f"Exception, reverting to fallback: {str(e)}")
+            return " ".join(postprocess_tags(translations, tags, input_type))
 
 
 def _postproc_html_sent_with_alignment(hyp_split: List[str], tags: List[Tuple[str, int, str]],
                                        alignment: List[Tuple[int, int]]):
+    # Prepare date structures
+    out_tokens = hyp_split.copy()
+    alignment_map = defaultdict(list)
+    for _al in alignment:
+        alignment_map[_al[0]].append(_al[1])
     try:
-        out_tokens = hyp_split.copy()
-        alignment_map = defaultdict(list)
-        for _al in alignment:
-            alignment_map[_al[0]].append(_al[1])
-
         tags_to_project = tag_projection_order_html(tags)
-        loser_tags = []
+    except Exception as e:
+        raise RuntimeError(f"Error preparing data for HTML tag projection: {str(e)}")
 
+    try:
         for tag in tags_to_project:
             if len(tag) == 2:
                 # Paired tag
                 bpt_tag = tag[0]
                 ept_tag = tag[1]
                 alignment_projection = list(chain(*[alignment_map[jj] for jj in range(bpt_tag[1], ept_tag[1])]))
-                if len(alignment_projection) == 0:
-                    raise RuntimeError("Alignment projection is empty")
-                t_min, t_max = min(alignment_projection), max(alignment_projection)
+                if len(alignment_projection) > 0:
+                    t_min, t_max = min(alignment_projection), max(alignment_projection)
 
-                # Actual projection part
-                # TODO: Fix BPT stuff
-                out_tokens[t_min] = f" {bpt_tag[0].replace(' ', '▁')}{out_tokens[t_min].strip()}"
-                out_tokens[t_max] = f"{out_tokens[t_max].strip()}{ept_tag[0].replace(' ', '▁')} "
-            else:
-                alignment_projection = None
-                for src_ph_tag_idx in range(tag[1], max(alignment_map.keys())):
-                    alignment_projection = alignment_map[src_ph_tag_idx]
-                    if len(alignment_projection) > 0:
-                        break
-                if alignment_projection:
-                    t_min = min(alignment_projection)
-                    out_tokens[t_min] = f" {tag[0].replace(' ', '▁')}{out_tokens[t_min].strip()}"
+                    # Actual projection part
+                    # TODO: For HTML, has never happened, but perhaps it is better to change the token order for tags
+                    # TODO: {previously_put_tags} {new_tag} word
+                    # TODO: vs {new_tag} {previously_put_tags} {word}
+                    out_tokens[t_min] = f" {bpt_tag[0].replace(' ', '▁')}{out_tokens[t_min].strip()}"
+                    out_tokens[t_max] = f"{out_tokens[t_max].strip()}{ept_tag[0].replace(' ', '▁')} "
                 else:
-                    loser_tags.append(f"{out_tokens[-1].strip()}{tag[0].replace(' ', '▁')}")
-
-        res = " ".join(out_tokens)
-
-        # TODO: Replace later for clarity. Used FOR DEBUGGING PURPOSES
-        first_out = re.sub(" +", " ", res)
-        second_out = first_out.replace('▁', ' ').strip()
-        return second_out
+                    out_tokens = place_ph_token(tag, alignment_map, out_tokens)
+            else:
+                out_tokens = place_ph_token(tag, alignment_map, out_tokens)
     except Exception as e:
-        print(f"EXCEPTION: {str(e)}")
-        raise RuntimeError(f"Something broken in the code: {str(e)}")
+        raise RuntimeError(f"Error in the tag projecting loop: {str(e)}")
+
+    return re.sub(" +", " ", " ".join(out_tokens)).replace('▁', ' ').strip()
+
+
+def place_ph_token(tag, alignment_map, out_tokens):
+    if len(tag) == 1:
+        tag_text = tag[0].replace(' ', '▁')
+    elif len(tag) == 2:
+        tag_text = f"{tag[0][0].replace(' ', '▁')} {tag[1][0].replace(' ', '▁')}"
+        raise NotImplementedError("I guess the code works, but it is easier to use fallback in this case")
+    else:
+        raise NotImplementedError("Place Unpaired token Error: Number of tags is not 1 or 2.")
+    if tag[1] == 0:
+        out_tag_index = 0
+    elif tag[1] == -1:
+        out_tag_index = -1
+    else:
+        alignment_projection = None
+        start_index = tag[1] if len(tag) == 1 else tag[0][1]
+        for src_ph_tag_idx in range(start_index, max(alignment_map.keys())):
+            alignment_projection = alignment_map[src_ph_tag_idx]
+            if len(alignment_projection) > 0:
+                break
+        out_tag_index = min(alignment_projection) if alignment_projection else -1
+    if out_tag_index >= 0:
+        out_tokens[out_tag_index] = f" {tag_text}{out_tokens[out_tag_index].strip()}"
+    else:
+        out_tokens[-1] = f"{out_tokens[-1].strip()}{tag_text}"
+    return out_tokens
 
 
 def tag_projection_order(tag_list):
     tag_translation_order = []
-    LIFO_paired_tags = []
+    lifo_paired_tags = []
 
     for tag in tag_list:
         if tag[2] == "bpt":
-            LIFO_paired_tags.append(tag)
+            lifo_paired_tags.append(tag)
         elif tag[2] == "ept":
             try:
-                tmp_open_tag_bpt = LIFO_paired_tags.pop()
+                tmp_open_tag_bpt = lifo_paired_tags.pop()
             except IndexError:
                 raise RuntimeError("Malformed alignment!")
             tag_translation_order.append((tmp_open_tag_bpt, tag))
         else:
             tag_translation_order.append(tag)
-    if len(LIFO_paired_tags) > 0:
+    if len(lifo_paired_tags) > 0:
         raise RuntimeError("Malformed/Broken input!")
     return tag_translation_order
 
 
 def tag_projection_order_html(tag_list):
     tag_translation_order = []
-    LIFO_paired_tags = {}
+    lifo_paired_tags = {}
 
     for tag in tag_list:
         if tag[2] == "bpt":
             tag_identifier = tag[0][1:-1]
-            LIFO_paired_tags[tag_identifier] = tag
+            lifo_paired_tags[tag_identifier] = tag
         elif tag[2] == "ept":
             try:
                 tag_identifier = tag[0][2:-1]
-                tmp_open_tag_bpt = LIFO_paired_tags.pop(tag_identifier, None)
+                tmp_open_tag_bpt = lifo_paired_tags.pop(tag_identifier, None)
             except IndexError:
-                print(f"Html tag alignment error: {LIFO_paired_tags}")
+                print(f"Html tag alignment error: {lifo_paired_tags}")
                 raise RuntimeError("Malformed HTML tag-alignment!")
             tag_translation_order.append((tmp_open_tag_bpt, tag))
         else:

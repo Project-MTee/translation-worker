@@ -97,7 +97,7 @@ class TranslatorWithAlignmentsTest(unittest.TestCase):
 
     def test_translate_web_tagged_input(self):
         request = Request(self.tagged_html_sources, "en", "et", "general", "web")
-        with open("en-web-500.txt") as fin, open("en-web-500.tgt.v1.txt", "w") as fin_tgt:
+        with open(f"TranslationSource.txt") as fin, open("TranslationTarget.txt", "w") as fin_tgt:
             for line in fin:
                 line = line.strip()
                 request = Request(line, "en", "et", "general", "web")
