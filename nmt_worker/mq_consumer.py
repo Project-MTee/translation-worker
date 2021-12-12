@@ -12,7 +12,7 @@ import pika.exceptions
 from .utils import Response, Request, RequestSchema
 from .translator import Translator
 
-LOGGER = logging.getLogger("nmt_worker")
+logger = logging.getLogger(__name__)
 
 
 class MQConsumer:
@@ -46,14 +46,14 @@ class MQConsumer:
         while True:
             try:
                 self._connect()
-                LOGGER.info('Ready to process requests.')
+                logger.info('Ready to process requests.')
                 self.channel.start_consuming()
             except pika.exceptions.AMQPConnectionError as e:
-                LOGGER.error(e)
-                LOGGER.info('Trying to reconnect in 5 seconds.')
+                logger.error(e)
+                logger.info('Trying to reconnect in 5 seconds.')
                 sleep(5)
             except KeyboardInterrupt:
-                LOGGER.info('Interrupted by user. Exiting...')
+                logger.info('Interrupted by user. Exiting...')
                 self.channel.close()
                 break
 
@@ -62,7 +62,7 @@ class MQConsumer:
         Connects to RabbitMQ, (re)declares the exchange for the service and a queue for the worker binding
         any alternative routing keys as needed.
         """
-        LOGGER.info(f'Connecting to RabbitMQ server: {{host: {self.connection_parameters.host}, '
+        logger.info(f'Connecting to RabbitMQ server: {{host: {self.connection_parameters.host}, '
                     f'port: {self.connection_parameters.port}}}')
         connection = pika.BlockingConnection(self.connection_parameters)
         self.channel = connection.channel()
@@ -99,7 +99,7 @@ class MQConsumer:
         Pass the request to the worker and return its response.
         """
         t1 = time()
-        LOGGER.info(f"Received request: {{id: {properties.correlation_id}, size: {getsizeof(body)} bytes}}")
+        logger.info(f"Received request: {{id: {properties.correlation_id}, size: {getsizeof(body)} bytes}}")
         try:
             request = json.loads(body)
             request = RequestSchema().load(request)
@@ -108,13 +108,14 @@ class MQConsumer:
         except ValidationError as error:
             response = Response(status=f'Error parsing input: {error.messages}', status_code=400)
         except Exception as e:
-            LOGGER.exception(f'Unexpected error: {e}')
+            logger.exception(f'Unexpected error: {e}')
             response = Response(status_code=500, status="Unknown internal error.")
 
-        respose_size = getsizeof(response)
+        response = response.encode()
+        response_size = getsizeof(response)
 
-        self._respond(channel, method, properties, response.encode())
+        self._respond(channel, method, properties, response)
         t2 = time()
 
-        LOGGER.info(f"Request processed: {{id: {properties.correlation_id}, duration: {round(t2 - t1, 3)} s, "
-                    f"size: {respose_size} bytes}}")
+        logger.info(f"Request processed: {{id: {properties.correlation_id}, duration: {round(t2 - t1, 3)} s, "
+                    f"size: {response_size} bytes}}")

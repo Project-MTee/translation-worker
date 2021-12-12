@@ -19,7 +19,7 @@ import torch
 from torch import Tensor, LongTensor
 from torch.nn import ModuleList, Module
 
-logger = logging.getLogger("nmt_worker")
+logger = logging.getLogger(__name__)
 
 
 class ModularHubInterface(Module):

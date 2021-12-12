@@ -1,25 +1,34 @@
 import itertools
 import logging
+from typing import List
+import warnings
 from typing import List, Tuple
 
 from nltk import sent_tokenize
 from .utils import Response, Request
+from .tag_utils import preprocess_tags, postprocess_tags
+from .normalization import normalize
 from .tag_utils import preprocess_tags, postprocess_tags, postprocess_tags_with_alignment
 
-logger = logging.getLogger("nmt_worker")
+logger = logging.getLogger(__name__)
+
+warnings.filterwarnings('ignore', '.*__floordiv__*', )
 
 
 class Translator:
     model = None
 
-    def __init__(self, modular: bool = False, with_alignment: bool = False, **kwargs):
+    def __init__(self, modular: bool,
+                 checkpoint_path: str, dict_dir: str, sentencepiece_dir, sentencepiece_prefix: str
+        with_alignment: bool = False
+    ):
         if modular:
-            self._load_modular_model(modular_with_alignment=with_alignment, **kwargs)
+            self._load_modular_model(checkpoint_path, dict_dir, sentencepiece_dir, sentencepiece_prefix, with_alignment=with_alignment)
             self.translate = self._translate_modular
             if with_alignment:
                 self.translate_align = self._translate_modular_with_align
         else:
-            self._load_model(**kwargs)
+            self._load_model(checkpoint_path, dict_dir, sentencepiece_dir, sentencepiece_prefix)
             self.translate = self._translate
         logger.info("All NMT models loaded")
 
@@ -45,29 +54,28 @@ class Translator:
 
         return sentences, delimiters
 
-    def _load_model(self, checkpoint_path: str, spm_model: str):
+    def _load_model(self, checkpoint_path: str, dict_dir: str, sentencepiece_dir, sentencepiece_prefix: str):
         from fairseq.models.transformer import TransformerModel
+        sentencepiece_dir = sentencepiece_dir.rstrip('/')
         self.model = TransformerModel.from_pretrained(
-            checkpoint_path,
-            checkpoint_file='checkpoint_best.pt',
+            "./",
+            checkpoint_file=checkpoint_path,
             bpe='sentencepiece',
-            sentencepiece_model=spm_model
+            sentencepiece_model=f"{sentencepiece_dir}/{sentencepiece_prefix}.model",
+            data_name_or_path=dict_dir
         )
 
-    def _load_modular_model(self, checkpoint_path: str, spm_prefix: str, modular_with_alignment: bool):
-        if modular_with_alignment:
-            from .modular_interface import ModularHubInterfaceWithAlignment
-            self.model = ModularHubInterfaceWithAlignment.from_pretrained_multilingual_transformer(
-                model_path=f'{checkpoint_path}/checkpoint_best.pt',
-                sentencepiece_prefix=spm_prefix,
-                dictionary_path=checkpoint_path
-            )
+    def _load_modular_model(self, checkpoint_path: str, dict_dir: str, sentencepiece_dir: str,
+                            sentencepiece_prefix: str, with_alignment: bool):
+        if with_alignment:
+            from .modular_interface import ModularHubInterfaceWithAlignment as ModularModel
         else:
-            from .modular_interface import ModularHubInterface
-            self.model = ModularHubInterface.from_pretrained(
-                model_path=f'{checkpoint_path}/checkpoint_best.pt',
-                sentencepiece_prefix=spm_prefix,
-                dictionary_path=checkpoint_path)
+            from .modular_interface import ModularHubInterface as ModularModel
+        sentencepiece_dir = sentencepiece_dir.rstrip('/')
+        self.model = ModularModel.from_pretrained(
+            model_path=checkpoint_path,
+            sentencepiece_prefix=f"{sentencepiece_dir}/{sentencepiece_prefix}",
+            dictionary_path=dict_dir)
 
     def _translate(self, sentences: List[str], **_) -> List[str]:
         return self.model.translate(sentences)
@@ -86,14 +94,15 @@ class Translator:
         for text in inputs:
             sentences, delimiters = self._sentence_tokenize(text)
             detagged, tags = preprocess_tags(sentences, request.input_type)
+            normalized = [normalize(sentence) for sentence in detagged]
             if len(tags[0]) > 1:
-                hyps_aligned, alignments = self.translate_align(detagged, src=request.src, tgt=request.tgt, domain=request.domain)
-                translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(hyps_aligned)]
-                retagged = postprocess_tags_with_alignment(detagged, translated, tags, request.input_type, alignments)
+                hyps_aligned, alignments = self.translate_align(normalized, src=request.src, tgt=request.tgt, domain=request.domain)
+                translated = [translation if normalized[idx] != '' else '' for idx, translation in enumerate(hyps_aligned)]
+                retagged = postprocess_tags_with_alignment(normalized, translated, tags, request.input_type, alignments)
                 translations.append(retagged)
             else:
-                translated = [translation if detagged[idx] != '' else '' for idx, translation in enumerate(
-                    self.translate(detagged, src=request.src, tgt=request.tgt, domain=request.domain))]
+                translated = [translation if normalized[idx] != '' else '' for idx, translation in enumerate(
+                    self.translate(normalized, src=request.src, tgt=request.tgt, domain=request.domain))]
                 retagged = postprocess_tags(translated, tags, request.input_type)
                 translations.append(''.join(itertools.chain.from_iterable(zip(delimiters, retagged))) + delimiters[-1])
 
