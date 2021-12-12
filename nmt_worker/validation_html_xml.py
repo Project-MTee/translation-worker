@@ -1,6 +1,7 @@
 from html.parser import HTMLParser
 import xml.etree.ElementTree as ET
 
+
 class MTeeHTMLParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -29,6 +30,7 @@ class MTeeHTMLParser(HTMLParser):
     def isHtml(self):
         return len(self.tag_stack) == 0
 
+
 def validateHTML(source, translation):
     if source != '' and translation != '':
         srcparser = MTeeHTMLParser()
@@ -44,6 +46,7 @@ def validateHTML(source, translation):
         return separately_html and (srcparser.tag_list == translationparser.tag_list)
     else:
         return False
+
 
 def validateXML(source, translation):
     if source != '' and translation != '':
