@@ -15,6 +15,7 @@ class MQConfig(BaseSettings):
     password: str = 'guest'
     exchange: str = 'translation'
     heartbeat: int = 30
+    connection_name: str = 'Translation worker'
 
     class Config:
         env_prefix = 'mq_'

@@ -81,7 +81,10 @@ class MQConsumer:
                 username=self.mq_config.username,
                 password=self.mq_config.password
             ),
-            heartbeat=self.mq_config.heartbeat
+            heartbeat=self.mq_config.heartbeat,
+            client_properties={
+                'connection_name': self.mq_config.connection_name
+            }
         ))
         self.channel = connection.channel()
         self.channel.queue_declare(queue=self.queue_name)
