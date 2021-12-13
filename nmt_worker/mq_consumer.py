@@ -3,40 +3,47 @@ import logging
 from sys import getsizeof
 from time import time, sleep
 
-from marshmallow import ValidationError
-from typing import List
+from pydantic import ValidationError
 
 import pika
 import pika.exceptions
+from pika import credentials, BlockingConnection, ConnectionParameters
 
-from .utils import Response, Request, RequestSchema
-from .translator import Translator
+from nmt_worker.schemas import Response, Request, InputType
+from nmt_worker.translator import Translator
+from nmt_worker.config import MQConfig
 
 logger = logging.getLogger(__name__)
 
 
 class MQConsumer:
-    def __init__(self, translator: Translator,
-                 connection_parameters: pika.connection.ConnectionParameters,
-                 exchange_name: str,
-                 routing_keys: List[str]):
+    def __init__(self, translator: Translator, mq_config: MQConfig):
         """
         Initializes a RabbitMQ consumer class that listens for requests for a specific worker and responds to
         them.
-
-        :param translator: A worker instance to be used.
-        :param connection_parameters: RabbitMQ connection_parameters parameters.
-        :param exchange_name: RabbitMQ exchange name.
-        :param routing_keys: RabbitMQ routing keys. The actual queue name will also automatically include the exchange
-        name to ensure that unique queues names are used.
         """
+        self.mq_config = mq_config
         self.translator = translator
-
-        self.exchange_name = exchange_name
-        self.routing_keys = sorted(routing_keys)
-        self.queue_name = self.routing_keys[0]
-        self.connection_parameters = connection_parameters
+        self.routing_keys = None
+        self.queue_name = None
         self.channel = None
+
+        self._generate_routing_keys()
+
+    def _generate_routing_keys(self):
+        """
+        Produce routing keys with the following format: exchange_name.src.tgt.domain.input_type
+        """
+        routing_keys = []
+        for language_pair in self.translator.model_config.language_pairs:
+            source, target = language_pair.split('-')
+
+            for domain in self.translator.model_config.domains:
+                for input_type in InputType:
+                    key = f'{self.mq_config.exchange}.{source}.{target}.{domain}.{input_type.value}'
+                    routing_keys.append(key)
+        self.routing_keys = sorted(routing_keys)
+        self.queue_name = routing_keys[0]
 
     def start(self):
         """
@@ -62,15 +69,22 @@ class MQConsumer:
         Connects to RabbitMQ, (re)declares the exchange for the service and a queue for the worker binding
         any alternative routing keys as needed.
         """
-        logger.info(f'Connecting to RabbitMQ server: {{host: {self.connection_parameters.host}, '
-                    f'port: {self.connection_parameters.port}}}')
-        connection = pika.BlockingConnection(self.connection_parameters)
+        logger.info(f'Connecting to RabbitMQ server: {{host: {self.mq_config.host}, port: {self.mq_config.port}}}')
+        connection = BlockingConnection(ConnectionParameters(
+            host=self.mq_config.host,
+            port=self.mq_config.port,
+            credentials=credentials.PlainCredentials(
+                username=self.mq_config.username,
+                password=self.mq_config.password
+            )
+        ))
         self.channel = connection.channel()
         self.channel.queue_declare(queue=self.queue_name)
-        self.channel.exchange_declare(exchange=self.exchange_name, exchange_type='direct')
+        self.channel.exchange_declare(exchange=self.mq_config.exchange, exchange_type='direct')
 
         for route in self.routing_keys:
-            self.channel.queue_bind(exchange=self.exchange_name, queue=self.queue_name, routing_key=route)
+            self.channel.queue_bind(exchange=self.mq_config.exchange, queue=self.queue_name,
+                                    routing_key=route)
 
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(queue=self.queue_name, on_message_callback=self._on_request)
@@ -102,11 +116,10 @@ class MQConsumer:
         logger.info(f"Received request: {{id: {properties.correlation_id}, size: {getsizeof(body)} bytes}}")
         try:
             request = json.loads(body)
-            request = RequestSchema().load(request)
             request = Request(**request)
             response = self.translator.process_request(request)
         except ValidationError as error:
-            response = Response(status=f'Error parsing input: {error.messages}', status_code=400)
+            response = Response(status=f'Error parsing input: {str(error)}', status_code=400)
         except Exception as e:
             logger.exception(f'Unexpected error: {e}')
             response = Response(status_code=500, status="Unknown internal error.")

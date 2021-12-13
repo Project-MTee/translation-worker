@@ -5,13 +5,13 @@ channels:
 dependencies:
   - python==3.9.7
   - nltk==3.5
-  - marshmallow==3.8.0
   - pytorch==1.10.0
   - torchvision==0.11.1
   - torchaudio==0.10.0
   - cpuonly==2.0
   - pyyaml==5.3.1
   - pika==1.2.0
+  - pydantic==1.8.2
   - git
   - pip
   - pip:

@@ -53,7 +53,7 @@ To initialize the sentence splitting functionality, the following command should
 RabbitMQ and PyTorch parameters should be configured with environment variables as described above. The worker can be
 started with:
 
-```python main.py [--worker-config models/config.yaml] [--log-config logging/logging.ini]```
+```python main.py [--model-config models/config.yaml] [--log-config logging/logging.ini]```
 
 ## Performance and hardware requirements
 
@@ -124,7 +124,6 @@ Known non-OK responses can occur in case the request format was incorrect. Examp
 
 ```
 {
-    "text": 1,
     "src": "et",
     "tgt": "en",
     "domain": "general",
@@ -134,12 +133,12 @@ Known non-OK responses can occur in case the request format was incorrect. Examp
 
 ```
 {
-    "status": "Error parsing input: {'text': ['Invalid value.']}",
+    "status": "1 validation error for Request\ntext\n  field required (type=value_error.missing)",
     "status_code": 400,
     "translation": null
 }
 ```
 
 The JSON-formatted part of the `status` field is the
-[ValidationError](https://marshmallow.readthedocs.io/en/stable/_modules/marshmallow/exceptions.html) message from
-Marshmallow Schema validation.
+[ValidationError](https://pydantic-docs.helpmanual.io/usage/models/#error-handling) message from
+Pydantic validation.

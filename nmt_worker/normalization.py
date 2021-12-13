@@ -1,4 +1,6 @@
-# adapted from moses punctuation normalization script
+"""
+Adapted from the Moses punctuation normalization script
+"""
 import re
 
 # define and compile all the patterns

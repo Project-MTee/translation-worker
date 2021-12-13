@@ -6,14 +6,12 @@ import re
 import html
 from typing import List, Tuple
 
+from nmt_worker.schemas import InputType
+
 tag_patterns = {
-    'document': r'</?(?:x|g|bx|ex)[^>]*>',
-    'web': r'</?(?:a|abbr|acronym|em|strong|b|i|s|strike|u|span|del|ins|sub|sup|code|samp|kbd|var|small|mark|ruby|rt'
-           r'|rp|bdi|bdo)[0-9]+/?>',
-    # both formats for testing mixed test files:
-    'test': r'</?(?:x|g|bx|ex)[^>]*>|'
-           r'</?(?:a|abbr|acronym|em|strong|b|i|s|strike|u|span|del|ins|sub|sup|code|samp|kbd|var|small|mark|ruby|rt'
-           r'|rp|bdi|bdo)[0-9]+/?>'
+    InputType.XML: r'</?(?:x|g|bx|ex)[^>]*>',
+    InputType.HTML: r'</?(?:a|abbr|acronym|em|strong|b|i|s|strike|u|span|del|ins|sub|sup|code|samp|kbd|var|small|mark|'
+                    r'ruby|rt|rp|bdi|bdo)[0-9]+/?>'
 }
 
 bpt = r'<[^/>]*>'
@@ -25,7 +23,7 @@ html_entities = {'<': '&lt;',
                  '&': '&amp;'}
 
 
-def preprocess_tags(sentences: List[str], input_type: str) -> (List[str], List[List[Tuple[str, int, str]]]):
+def preprocess_tags(sentences: List[str], input_type: InputType) -> (List[str], List[List[Tuple[str, int, str]]]):
     if input_type in tag_patterns:
         pattern = tag_patterns[input_type]
         clean_sentences = []
@@ -63,7 +61,7 @@ def preprocess_tags(sentences: List[str], input_type: str) -> (List[str], List[L
     return clean_sentences, tags
 
 
-def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, str]]], input_type: str):
+def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, str]]], input_type: InputType):
     translations = [sentence.replace("<unk>", "") for sentence in translations]
 
     if input_type in tag_patterns:

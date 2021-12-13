@@ -6,3 +6,4 @@ __pycache__/
 Dockerfile
 LICENSE
 README.md
+tests/
