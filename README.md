@@ -30,6 +30,9 @@ environment. The container should be configured using the following parameters:
         - `MQ_PASSWORD` - RabbitMQ user password
         - `MQ_HOST` - RabbitMQ host
         - `MQ_PORT` (optional) - RabbitMQ port (`5672` by default)
+        - `MQ_EXCHANGE` (optional) - RabbitMQ exchange name (`translation` by default)
+        - `MQ_CONNECTION_NAME` (optional) - friendly connection name (`Translation worker` by default)
+        - `MQ_HEARTBEAT` (optional) - heartbeat interval (`30` seconds by default)
     - PyTorch-related variables:
         - `MKL_NUM_THREADS` (optional) - number of threads used for intra-op parallelism by PyTorch. This defaults to
           the number of CPU cores which may cause computational overhead when deployed on larger nodes. Alternatively,
