@@ -28,9 +28,9 @@ class MQConsumer:
         self.queue_name = None
         self.channel = None
 
-        self._generate_routing_keys()
+        self._generate_queue_config()
 
-    def _generate_routing_keys(self):
+    def _generate_queue_config(self):
         """
         Produce routing keys with the following format: exchange_name.src.tgt.domain.input_type
         """
@@ -43,7 +43,11 @@ class MQConsumer:
                     key = f'{self.mq_config.exchange}.{source}.{target}.{domain}.{input_type.value}'
                     routing_keys.append(key)
         self.routing_keys = sorted(routing_keys)
-        self.queue_name = routing_keys[0]
+        if self.translator.model_config.modular:
+            self.queue_name = f'{self.mq_config.exchange}.modular.{self.translator.model_config.domains[0]}'
+        else:
+            self.queue_name = f'{self.mq_config.exchange}.{self.translator.model_config.language_pairs[0]}.' \
+                              f'{self.translator.model_config.domains[0]}'
 
     def start(self):
         """
@@ -76,7 +80,8 @@ class MQConsumer:
             credentials=credentials.PlainCredentials(
                 username=self.mq_config.username,
                 password=self.mq_config.password
-            )
+            ),
+            heartbeat=self.mq_config.heartbeat
         ))
         self.channel = connection.channel()
         self.channel.queue_declare(queue=self.queue_name)
