@@ -58,7 +58,7 @@ started with:
 ## Performance and hardware requirements
 
 The worker loads the NMT model into memory. The exact RAM usage depends on the model and should always be tested, but a
-conservative estimate is to have **3 GB of memory** available (tested with a modular model with 4 input and 4 output
+conservative estimate is to have **8 GB of memory** available (tested with a modular model with 4 input and 4 output
 languages).
 
 The performance depends on the available CPU resources, however, this should be finetuned for the deployment 
