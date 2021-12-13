@@ -6,4 +6,4 @@ pyyaml==5.3.1
 pika==1.2.0
 git+https://github.com/TartuNLP/fairseq.git@mtee-0.1.0
 sentencepiece==0.1.96
-pydantic~=1.8.2
+pydantic==1.8.2
