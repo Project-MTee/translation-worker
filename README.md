@@ -14,7 +14,7 @@ repository. There are two seprate images:
 
 - [`translation-worker`](https://ghcr.io/project-mtee/translation-worker) (documented below)
 - [`translation-model`](https://ghcr.io/project-mtee/translation-worker)
-  (documented in [`models/README.md`](https://github.com/project-mtee/translation-worker/models)).
+  (documented in [`models/README.md`](https://github.com/Project-MTee/translation-worker/tree/main/models)).
 
 The translation worker can be set up using the [`translation-worker`](https://ghcr.io/project-mtee/translation-worker)
 image. This image contains only the environment setup and code to run the models, and is designed to be used in a CPU
