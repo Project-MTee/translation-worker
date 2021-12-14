@@ -13,7 +13,6 @@ ENV PYTHONIOENCODING=utf-8
 ENV MKL_NUM_THREADS=""
 
 WORKDIR /app
-VOLUME /app/models
 
 RUN adduser --disabled-password --gecos "app" app && \
     chown -R app:app /app
