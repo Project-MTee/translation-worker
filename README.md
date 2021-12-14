@@ -9,7 +9,7 @@ the [custom FairSeq fork](https://github.com/TartuNLP/fairseq/releases/tag/mtee-
 
 ## Docker setup
 
-The easiest and recommended way to set up the transltion worker, is by using the docker images published alongside this
+The easiest and recommended way to set up the translation worker, is by using the docker images published alongside this
 repository. There are two seprate images:
 
 - [`translation-worker`](https://ghcr.io/project-mtee/translation-worker) (documented below)

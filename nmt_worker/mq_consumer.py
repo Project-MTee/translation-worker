@@ -1,5 +1,6 @@
 import json
 import logging
+import hashlib
 from sys import getsizeof
 from time import time, sleep
 
@@ -24,7 +25,7 @@ class MQConsumer:
         """
         self.mq_config = mq_config
         self.translator = translator
-        self.routing_keys = None
+        self.routing_keys = []
         self.queue_name = None
         self.channel = None
 
@@ -43,11 +44,12 @@ class MQConsumer:
                     key = f'{self.mq_config.exchange}.{source}.{target}.{domain}.{input_type.value}'
                     routing_keys.append(key)
         self.routing_keys = sorted(routing_keys)
+        hashed = hashlib.sha256(str(self.routing_keys).encode('utf-8')).hexdigest()[:8]
         if self.translator.model_config.modular:
-            self.queue_name = f'{self.mq_config.exchange}.modular.{self.translator.model_config.domains[0]}'
+            self.queue_name = f'{self.mq_config.exchange}.modular.{self.translator.model_config.domains[0]}_{hashed}'
         else:
             self.queue_name = f'{self.mq_config.exchange}.{self.translator.model_config.language_pairs[0]}.' \
-                              f'{self.translator.model_config.domains[0]}'
+                              f'{self.translator.model_config.domains[0]}_{hashed}'
 
     def start(self):
         """
