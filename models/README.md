@@ -7,7 +7,7 @@ file size limitations, these may be uploaded as multipart zip files which have t
 
 Alternatively, models are built into the [`translation-model`](https://ghcr.io/project-mtee/translation-model) images 
 published alongside this repository. These are `busybox` images that simply contain all model files in the 
-`/app/models/` directory. They can be used as init containers to populate the `/app/models/` volume of the 
+`/models/` directory. They can be used as init containers to populate the `/app/models/` volume of the 
 [`translation-worker`](https://ghcr.io/project-mtee/translation-worker) instance. 
 
 Each model is published as a separate image and corresponds to a specific release. Compatibility between 
@@ -31,7 +31,8 @@ All file and directory paths must relative to the root directory of this reposit
 `models/checkpoint_best.pt`). More info on where to find the correct files is documented with our 
 [model training workflow](https://github.com/Project-MTee/model_training).
 
-The included Dockerfile can be used to publish new model versions.
+The included Dockerfile can be used to publish new model versions. The build-time argument `MODEL_DIR` can be used to
+specify a subdirectory to be copied to `/models/` instead of the current directory.
 
 ### Configuration samples
 
