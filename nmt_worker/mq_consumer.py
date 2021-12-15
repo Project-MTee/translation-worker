@@ -16,6 +16,8 @@ from nmt_worker.config import MQConfig
 
 logger = logging.getLogger(__name__)
 
+X_EXPIRES = 60000
+
 
 class MQConsumer:
     def __init__(self, translator: Translator, mq_config: MQConfig):
@@ -89,7 +91,9 @@ class MQConsumer:
             }
         ))
         self.channel = connection.channel()
-        self.channel.queue_declare(queue=self.queue_name)
+        self.channel.queue_declare(queue=self.queue_name, arguments={
+            'x-expires': X_EXPIRES
+        })
         self.channel.exchange_declare(exchange=self.mq_config.exchange, exchange_type='direct')
 
         for route in self.routing_keys:
