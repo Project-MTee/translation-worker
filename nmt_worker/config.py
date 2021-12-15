@@ -14,7 +14,7 @@ class MQConfig(BaseSettings):
     username: str = 'guest'
     password: str = 'guest'
     exchange: str = 'translation'
-    heartbeat: int = 30
+    heartbeat: int = 60
     connection_name: str = 'Translation worker'
 
     class Config:
