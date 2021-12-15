@@ -84,7 +84,7 @@ second. For more information, please refer to
 ## Request format
 
 The worker consumes translation requests from a RabbitMQ message broker and responds with the translated text. The
-following format is compatible with the [text translation API](https://ghcr.io/project-mtee/text-translation-service).
+following format is compatible with the [translation API](https://ghcr.io/project-mtee/translation-api-service).
 
 Requests should be published with the following parameters:
 
