@@ -45,10 +45,9 @@ By default, the container entrypoint is `main.py` without additional arguments, 
 ## Manual setup
 
 For a manual setup, please refer to the included Dockerfile and the environment specification described in
-`requirements/requirements.txt`. Alternatively, the included `requirements/environment.yml` can be used to install the
-requirements using Conda. Additionally,
-[`models/README.md`](https://github.com/project-mtee/translation-worker/tree/main/models) describes how models should be
-set up correctly.
+`requirements/requirements.txt`.
+Additionally, [`models/README.md`](https://github.com/project-mtee/translation-worker/tree/main/models) describes how
+models should be set up correctly.
 
 To initialize the sentence splitting functionality, the following command should be run before starting the application:
 

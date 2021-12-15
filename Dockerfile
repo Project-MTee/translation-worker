@@ -20,7 +20,7 @@ USER app
 
 ENV PATH="/home/app/.local/bin:${PATH}"
 
-COPY --chown=app:app requirements/requirements.txt .
+COPY --chown=app:app requirements.txt .
 RUN pip install --user -r requirements.txt && \
     rm requirements.txt && \
     python -c "import nltk; nltk.download(\"punkt\")"
