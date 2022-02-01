@@ -3,19 +3,14 @@ import yaml
 from yaml.loader import SafeLoader
 
 from nmt_worker.translator import Translator
-from nmt_worker.utils import Request
+from nmt_worker.schemas import Request
 from nmt_worker.validation_html_xml import validate
 
 with open('models/config.yaml', 'r', encoding='utf-8') as f:
     config = yaml.load(f, Loader=SafeLoader)
 
 modular_model = Translator(
-        config['modular'],
-        config['checkpoint'],
-        config['dict_dir'],
-        config['sentencepiece_dir'],
-        config['sentencepiece_prefix'],
-        config["alignment"],
+    # TODO: copy main method stuff here
     )
 
 

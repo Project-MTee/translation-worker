@@ -4,7 +4,10 @@ All tags are removed and appended to the translation.
 """
 import re
 import html
+from dataclasses import dataclass
 from typing import List, Tuple
+from itertools import chain
+from collections import defaultdict
 
 from nmt_worker.schemas import InputType
 
@@ -110,7 +113,7 @@ def postprocess_tags_with_alignment(sources: List[str], translations: List[str],
     if set(i[1] for i in chain(*tags)) == {0, -1}:
         return " ".join(postprocess_tags(translations, tags, input_type))
     else:
-        if input_type in tagged_input_types:
+        if input_type in tag_patterns:
             for symbol, entity in html_entities.items():
                 translations = [sentence.replace(symbol, entity) for sentence in translations]
         if len(translations) > 1:
