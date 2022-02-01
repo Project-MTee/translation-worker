@@ -78,6 +78,6 @@ class Translator:
             translations.append(
                 ''.join(itertools.chain.from_iterable(zip(delimiters, translated))) + delimiters[-1])
 
-            response = Response(translation=translations[0] if type(request.text) == str else translations)
+        response = Response(translation=translations[0] if type(request.text) == str else translations)
 
         return response
