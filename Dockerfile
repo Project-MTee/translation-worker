@@ -13,7 +13,6 @@ ENV PYTHONIOENCODING=utf-8
 ENV MKL_NUM_THREADS=""
 
 WORKDIR /app
-VOLUME /app/models
 
 RUN adduser --disabled-password --gecos "app" app && \
     chown -R app:app /app
@@ -21,7 +20,7 @@ USER app
 
 ENV PATH="/home/app/.local/bin:${PATH}"
 
-COPY --chown=app:app requirements/requirements.txt .
+COPY --chown=app:app requirements.txt .
 RUN pip install --user -r requirements.txt && \
     rm requirements.txt && \
     python -c "import nltk; nltk.download(\"punkt\")"

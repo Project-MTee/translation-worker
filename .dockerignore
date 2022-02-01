@@ -1,4 +1,4 @@
-/models
+models/
 .idea/
 __pycache__/
 .git/
@@ -6,3 +6,4 @@ __pycache__/
 Dockerfile
 LICENSE
 README.md
+tests/

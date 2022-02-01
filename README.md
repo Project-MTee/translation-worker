@@ -9,12 +9,12 @@ the [custom FairSeq fork](https://github.com/TartuNLP/fairseq/releases/tag/mtee-
 
 ## Docker setup
 
-The easiest and recommended way to set up the transltion worker, is by using the docker images published alongside this
+The easiest and recommended way to set up the translation worker, is by using the docker images published alongside this
 repository. There are two seprate images:
 
 - [`translation-worker`](https://ghcr.io/project-mtee/translation-worker) (documented below)
 - [`translation-model`](https://ghcr.io/project-mtee/translation-worker)
-  (documented in [`models/README.md`](https://github.com/project-mtee/translation-worker/models)).
+  (documented in [`models/README.md`](https://github.com/Project-MTee/translation-worker/tree/main/models)).
 
 The translation worker can be set up using the [`translation-worker`](https://ghcr.io/project-mtee/translation-worker)
 image. This image contains only the environment setup and code to run the models, and is designed to be used in a CPU
@@ -30,6 +30,9 @@ environment. The container should be configured using the following parameters:
         - `MQ_PASSWORD` - RabbitMQ user password
         - `MQ_HOST` - RabbitMQ host
         - `MQ_PORT` (optional) - RabbitMQ port (`5672` by default)
+        - `MQ_EXCHANGE` (optional) - RabbitMQ exchange name (`translation` by default)
+        - `MQ_CONNECTION_NAME` (optional) - friendly connection name (`Translation worker` by default)
+        - `MQ_HEARTBEAT` (optional) - heartbeat value (`60` seconds by default)
     - PyTorch-related variables:
         - `MKL_NUM_THREADS` (optional) - number of threads used for intra-op parallelism by PyTorch. This defaults to
           the number of CPU cores which may cause computational overhead when deployed on larger nodes. Alternatively,
@@ -42,9 +45,9 @@ By default, the container entrypoint is `main.py` without additional arguments, 
 ## Manual setup
 
 For a manual setup, please refer to the included Dockerfile and the environment specification described in
-`requirements/requirements.txt`. Alternatively, the included `requirements/environment.yml` can be used to install the
-requirements using Conda. Additionally, [`models/README.md`](https://github.com/project-mtee/translation-worker/models)
-describes how models should be set up correctly.
+`requirements/requirements.txt`.
+Additionally, [`models/README.md`](https://github.com/project-mtee/translation-worker/tree/main/models) describes how
+models should be set up correctly.
 
 To initialize the sentence splitting functionality, the following command should be run before starting the application:
 
@@ -53,35 +56,35 @@ To initialize the sentence splitting functionality, the following command should
 RabbitMQ and PyTorch parameters should be configured with environment variables as described above. The worker can be
 started with:
 
-```python main.py [--worker-config models/config.yaml] [--log-config logging/logging.ini]```
+```python main.py [--model-config models/config.yaml] [--log-config logging/logging.ini]```
 
 ## Performance and hardware requirements
 
 The worker loads the NMT model into memory. The exact RAM usage depends on the model and should always be tested, but a
-conservative estimate is to have **3 GB of memory** available (tested with a modular model with 4 input and 4 output
+conservative estimate is to have **8 GB of memory** available (tested with a modular model with 4 input and 4 output
 languages).
 
-The performance depends on the available CPU resources, however, this should be finetuned for the deployment 
-infrastructure. By default, PyTorch will try to utilize all CPU cores to 100% and run as many threads as there are cores.
-This can cause major computational overhead if the worker is deployed on large nodes. The **number of threads used 
-should be limited** using the `MKL_NUM_THREADS` environment variable or the `docker run` flag `--cpuset-cpus`. 
+The performance depends on the available CPU resources, however, this should be finetuned for the deployment
+infrastructure. By default, PyTorch will try to utilize all CPU cores to 100% and run as many threads as there are
+cores. This can cause major computational overhead if the worker is deployed on large nodes. The **number of threads
+used should be limited** using the `MKL_NUM_THREADS` environment variable or the `docker run` flag `--cpuset-cpus`.
 
-Limiting CPU usage by docker configuration which only limits CPU shares is not sufficient (e.g. `docker run` flag 
+Limiting CPU usage by docker configuration which only limits CPU shares is not sufficient (e.g. `docker run` flag
 `--cpus` or the CPU limit in K8s, unless the non-default
-[static CPU Manager policy](https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/) is used). For 
-example, on a node with 128 cores, setting the CPU limit at `16.0` results in 128 parallel threads running with each 
-one utilizing only 1/8 of each core's computational potential. This amplifies the effect of multithreading overhead
-and can result in inference speeds up to 20x slower than expected.
+[static CPU Manager policy](https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/) is used). For
+example, on a node with 128 cores, setting the CPU limit at `16.0` results in 128 parallel threads running with each one
+utilizing only 1/8 of each core's computational potential. This amplifies the effect of multithreading overhead and can
+result in inference speeds up to 20x slower than expected.
 
-Although the optimal number of threads depends on the exact model and infrastructure used, a good starting point is 
-around `16`. With optimal configuration and modern hardware, the worker should be able to process ~7 sentences per 
-second. For more information, please refer to 
+Although the optimal number of threads depends on the exact model and infrastructure used, a good starting point is
+around `16`. With optimal configuration and modern hardware, the worker should be able to process ~7 sentences per
+second. For more information, please refer to
 [PyTorch documentation](https://pytorch.org/docs/stable/notes/cpu_threading_torchscript_inference.html).
 
 ## Request format
 
 The worker consumes translation requests from a RabbitMQ message broker and responds with the translated text. The
-following format is compatible with the [text translation API](https://ghcr.io/project-mtee/text-translation-api).
+following format is compatible with the [translation API](https://ghcr.io/project-mtee/translation-api-service).
 
 Requests should be published with the following parameters:
 
@@ -124,7 +127,6 @@ Known non-OK responses can occur in case the request format was incorrect. Examp
 
 ```
 {
-    "text": 1,
     "src": "et",
     "tgt": "en",
     "domain": "general",
@@ -134,12 +136,11 @@ Known non-OK responses can occur in case the request format was incorrect. Examp
 
 ```
 {
-    "status": "Error parsing input: {'text': ['Invalid value.']}",
+    "status": "1 validation error for Request\ntext\n  field required (type=value_error.missing)",
     "status_code": 400,
     "translation": null
 }
 ```
 
 The JSON-formatted part of the `status` field is the
-[ValidationError](https://marshmallow.readthedocs.io/en/stable/_modules/marshmallow/exceptions.html) message from
-Marshmallow Schema validation.
+[ValidationError](https://pydantic-docs.helpmanual.io/usage/models/#error-handling) message from Pydantic validation.

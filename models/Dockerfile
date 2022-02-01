@@ -1,3 +1,5 @@
 FROM busybox
 
-COPY . /app/models
+ARG MODEL_DIR=./
+
+COPY ${MODEL_DIR} /models

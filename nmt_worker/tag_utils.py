@@ -5,13 +5,18 @@ All tags are removed and appended to the translation.
 import re
 import html
 from typing import List, Tuple
-from collections import defaultdict
-from itertools import chain
-from dataclasses import dataclass
 
-tagged_input_types = ('document', 'web')
-tag_pattern = r'<[^/>]*>\s*</[^>]*>|' \
-              r'<[^>]*>'
+from nmt_worker.schemas import InputType
+
+tag_patterns = {
+    InputType.XML: r'</?(?:x|g|bx|ex)[^>]*>',
+    InputType.HTML: r'</?(?:a|abbr|acronym|em|strong|b|i|s|strike|u|span|del|ins|sub|sup|code|samp|kbd|var|small|mark|'
+                    r'ruby|rt|rp|bdi|bdo)[0-9]+/?>'
+}
+
+# tagged_input_types = ('document', 'web')
+# tag_pattern = r'<[^/>]*>\s*</[^>]*>|' \
+#               r'<[^>]*>'
 
 bpt = re.compile(r'<[^/>]*>')
 ept = re.compile(r'</[^>]*>')
@@ -23,20 +28,21 @@ html_entities = {'<': '&lt;',
                  '&': '&amp;'}
 
 
-def preprocess_tags(sentences: List[str], input_type: str) -> (List[str], List[List[Tuple[str, int, str]]]):
+def preprocess_tags(sentences: List[str], input_type: InputType) -> (List[str], List[List[Tuple[str, int, str]]]):
     # TODO: search for cases, where bpt and ept are with zero span, eg
     # TODO: '<g id="1">BLA <g id="3"> </g> YouTube</g>'
     # <g id="1">EDEXIM European Database Export Import of Dangerous Chemicals,</g>
     # <g id="2">http://edexim.jrc.it/</g><g id="3"> </g><g id="4">(last accessed 15.05.2011).</g>
-    if input_type in tagged_input_types:
+    if input_type in tag_patterns:
+        pattern = tag_patterns[input_type]
         clean_sentences = []
         tags = []
         for sentence in sentences:
             sentence = sentence.strip()
             sentence_tags = []  # list of tuples (tag, indexes, tag_type)
 
-            tokens = list(filter(None, re.split(rf' |{tag_pattern}', sentence)))
-            tokens_w_tags = list(filter(None, re.split(rf' |({tag_pattern})', sentence)))
+            tokens = list(filter(None, re.split(rf' |{pattern}', sentence)))
+            tokens_w_tags = list(filter(None, re.split(rf' |({pattern})', sentence)))
 
             clean_sentences.append(' '.join(tokens).strip())
 
@@ -68,10 +74,10 @@ def preprocess_tags(sentences: List[str], input_type: str) -> (List[str], List[L
     return clean_sentences, tags
 
 
-def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, str]]], input_type: str):
+def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, str]]], input_type: InputType):
     translations = [sentence.replace("<unk>", "") for sentence in translations]
 
-    if input_type in tagged_input_types:
+    if input_type in tag_patterns:
         for symbol, entity in html_entities.items():
             translations = [sentence.replace(symbol, entity) for sentence in translations]
 
