@@ -31,11 +31,12 @@ html_entities = {'<': '&lt;',
                  '&': '&amp;'}
 
 
-def preprocess_tags(sentences: List[str], input_type: InputType) -> (List[str], List[List[Tuple[str, int, str]]]):
+def preprocess_tags(sentences: List[str], input_type: InputType) -> (List[str], List[List[Tuple[str, int, str]]], bool):
     # TODO: search for cases, where bpt and ept are with zero span, eg
     # TODO: '<g id="1">BLA <g id="3"> </g> YouTube</g>'
     # <g id="1">EDEXIM European Database Export Import of Dangerous Chemicals,</g>
     # <g id="2">http://edexim.jrc.it/</g><g id="3"> </g><g id="4">(last accessed 15.05.2011).</g>
+    tags_exist = False
     if input_type in tag_patterns:
         pattern = tag_patterns[input_type]
         clean_sentences = []
@@ -65,7 +66,8 @@ def preprocess_tags(sentences: List[str], input_type: InputType) -> (List[str], 
                         # TODO: What is this? 00:02
 
                         raise RuntimeError(f"Illegal tag: {item} found.")
-
+            if sentence_tags:
+                tags_exist = True
             tags.append(sentence_tags)
 
     else:
@@ -74,7 +76,7 @@ def preprocess_tags(sentences: List[str], input_type: InputType) -> (List[str], 
 
     clean_sentences = [html.unescape(sentence) for sentence in clean_sentences]
 
-    return clean_sentences, tags
+    return clean_sentences, tags, tags_exist
 
 
 def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, str]]], input_type: InputType):
@@ -109,13 +111,14 @@ def postprocess_tags(translations: List[str], tags: List[List[Tuple[str, int, st
 
 def postprocess_tags_with_alignment(sources: List[str], translations: List[str], tags: List[List[Tuple[str, int, str]]],
                                     input_type: str, alignments: List[List[Tuple[int, int]]]):
+    if input_type in tag_patterns:
+        for symbol, entity in html_entities.items():
+            translations = [sentence.replace(symbol, entity) for sentence in translations]
     # Ideal case (Tags only in the beginning and the end
+
     if set(i[1] for i in chain(*tags)) == {0, -1}:
         return " ".join(postprocess_tags(translations, tags, input_type))
     else:
-        if input_type in tag_patterns:
-            for symbol, entity in html_entities.items():
-                translations = [sentence.replace(symbol, entity) for sentence in translations]
         if len(translations) > 1:
             hyps_split = " ".join(translations).split()
             max_al_ix_src = 0
@@ -351,7 +354,6 @@ def recursive_tag_projection_with_trees(out_tokens, alignment_map, tag_tree):
 
     _helper(tag_tree)
     return res
-
 
 
 def _postproc_xml_sent_with_alignment(hyp_split: List[str], tags: List[Tuple[str, int, str]],

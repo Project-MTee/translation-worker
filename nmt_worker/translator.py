@@ -3,7 +3,7 @@ import os
 import itertools
 import logging
 import warnings
-from typing import List, Tuple
+from typing import List
 
 from .config import ModelConfig
 from .schemas import Response, Request
@@ -26,7 +26,7 @@ class Translator:
         if model_config.modular:
             self.translate = self._translate_modular
         else:
-            self.translate = self._translate
+            self.translate = self._translate_unidirectional
 
         logger.info("All NMT models loaded")
 
@@ -48,15 +48,24 @@ class Translator:
                 data_name_or_path=self.model_config.dict_dir
             )
 
-    def _translate(self, sentences: List[str], **_) -> List[str]:
-        return self.model.translate(sentences)
+    def _translate_unidirectional(
+            self, sentences: List[str], request: Request, tags: List, tags_exist: bool) -> List[str]:
+        translated = [translation if sentences[idx] != '' else '' for idx, translation in enumerate(
+            self.model.translate(sentences))]
+        if tags_exist:
+            translated = postprocess_tags(translated, tags, request.input_type)
+        return translated
 
-    def _translate_modular(self, sentences: List[str], src: str, tgt: str, **_) -> List[str]:
-        return self.model.translate(sentences, src_language=src, tgt_language=tgt)
-
-    def _translate_modular_with_align(self, sentences: List[str], src: str, tgt: str, **_) \
-            -> Tuple[List[str], List[List[Tuple[int, int]]]]:
-        return self.model.translate_align(sentences, src_language=src, tgt_language=tgt, replace_unks=True)
+    def _translate_modular(self, sentences: List[str], request: Request, tags: List, tags_exist: bool) -> List[str]:
+        if tags_exist:
+            translated, alignments = self.model.translate_align(sentences, src_language=request.src,
+                                                                tgt_language=request.tgt,
+                                                                replace_unks=True)
+            # TODO
+            return translated
+        else:
+            return [translation if sentences[idx] != '' else '' for idx, translation in enumerate(
+                self.model.translate(sentences, src_language=request.src, tgt_language=request.tgt))]
 
     def process_request(self, request: Request) -> Response:
         inputs = [request.text] if type(request.text) == str else request.text
@@ -64,13 +73,12 @@ class Translator:
 
         for text in inputs:
             sentences, delimiters = sentence_tokenize(text)
-            detagged, tags = preprocess_tags(sentences, request.input_type)
+            detagged, tags, tags_exist = preprocess_tags(sentences, request.input_type)
             normalized = [normalize(sentence) for sentence in detagged]
-            translated = [translation if normalized[idx] != '' else '' for idx, translation in enumerate(
-                self.translate(normalized, src=request.src, tgt=request.tgt, domain=request.domain))]
-            retagged = postprocess_tags(translated, tags, request.input_type)
-            translations.append(''.join(itertools.chain.from_iterable(zip(delimiters, retagged))) + delimiters[-1])
+            translated = self.translate(normalized, request, tags, tags_exist)
+            translations.append(
+                ''.join(itertools.chain.from_iterable(zip(delimiters, translated))) + delimiters[-1])
 
-        response = Response(translation=translations[0] if type(request.text) == str else translations)
+            response = Response(translation=translations[0] if type(request.text) == str else translations)
 
         return response
