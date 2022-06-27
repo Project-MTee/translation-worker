@@ -2,9 +2,11 @@ import json
 from enum import Enum
 from typing import Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
 from pydantic.json import pydantic_encoder
+
+from nmt_worker import worker_config
 
 
 class InputType(Enum):
@@ -18,7 +20,7 @@ class Request(BaseModel):
     """
     A class that can be used to store NMT requests
     """
-    text: Union[str, list]
+    text: Union[str, list] = Field(..., max_length=worker_config.max_input_length)
     src: str
     tgt: str
     domain: str

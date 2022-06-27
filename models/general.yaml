@@ -1,0 +1,16 @@
+language_pairs:
+  - de-et
+  - en-et
+  - ru-et
+  - et-de
+  - et-en
+  - et-ru
+domains:
+  - general
+
+huggingface: tartuNLP/mtee-general
+model_root: models/tartuNLP/mtee-general
+modular: True
+
+checkpoint: modular_model.pt
+sentencepiece_prefix: sp-model

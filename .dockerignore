@@ -1,9 +1,12 @@
-models/
 .idea/
 __pycache__/
 .git/
 .gitignore
+.dockerignore
 Dockerfile
 LICENSE
 README.md
 tests/
+
+models/
+!models/*.yaml

@@ -1,0 +1,16 @@
+language_pairs:
+  - de-et
+  - en-et
+  - ru-et
+  - et-de
+  - et-en
+  - et-ru
+domains:
+  - crisis
+
+huggingface: tartuNLP/mtee-crisis
+model_root: models/tartuNLP/mtee-crisis
+modular: True
+
+checkpoint: modular_model.pt
+sentencepiece_prefix: sp-model

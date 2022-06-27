@@ -7,22 +7,19 @@ with standard single-direction baseline models as well as modular multilingual m
 For more information, please refer to the [model training scripts](https://github.com/Project-MTee/model_training) and
 the [custom FairSeq fork](https://github.com/TartuNLP/fairseq/releases/tag/mtee-0.1.0) used in this project.
 
-## Docker setup
+## Setup
 
 The easiest and recommended way to set up the translation worker, is by using the docker images published alongside this
-repository. There are two seprate images:
+repository, and it is designed to be used in a CPU environment. Starting from version 1.2.0, we
+publish [`translation-worker`](https://ghcr.io/project-mtee/translation-worker) images with and without models. For more
+information about configuring custom models can be found
+in [`models/README.md`](https://github.com/Project-MTee/translation-worker/tree/main/models)).
 
-- [`translation-worker`](https://ghcr.io/project-mtee/translation-worker) (documented below)
-- [`translation-model`](https://ghcr.io/project-mtee/translation-worker)
-  (documented in [`models/README.md`](https://github.com/Project-MTee/translation-worker/tree/main/models)).
+- `HF_MODEL` (optional) - a HuggingFace model
+  identifyer ([`tartuNLP/mtee-domain-detection`](https://huggingface.co/tartuNLP/mtee-domain-detection) by
+  default). The model is automatically downloaded from HuggingFace during the build phase.
 
-The translation worker can be set up using the [`translation-worker`](https://ghcr.io/project-mtee/translation-worker)
-image. This image contains only the environment setup and code to run the models, and is designed to be used in a CPU
-environment. The container should be configured using the following parameters:
-
-- Volumes:
-    - `/app/models/` - the image does not contain the model files and these must be attached as described in
-      [`models/README.md`](https://github.com/project-mtee/translation-worker/models).
+The running container should be configured using the following parameters:
 
 - Environment variables:
     - Variables that configure the connection to a [RabbitMQ message broker](https://www.rabbitmq.com/):
@@ -38,27 +35,43 @@ environment. The container should be configured using the following parameters:
           the number of CPU cores which may cause computational overhead when deployed on larger nodes. Alternatively,
           the `docker run` flag `--cpuset-cpus` can be used to control this. For more details, refer to
           the [performance and hardware requirements](#performance-and-hardware-requirements) section below.
+    - Translation-related variables:
+        - `WORKER_MAX_INPUT_LENGTH` (optional) - the number of characters allowed per request (`10000` by default).
+          Longer requests will return validation errors with status code `400`.
 
-By default, the container entrypoint is `main.py` without additional arguments, but these can be defined with the
-`COMMAND` option. For example by using `["--log-config", "logging/debug.ini"]` to enable debug level logging.
+- Optional runtime flags (the `COMMAND` option):
+    - `--model-config` - path to the model config file (`models/config.yaml` by default). The default file is included
+      in images that already include models. Compatible sample files are included in the `models/` directory and the
+      format is described in [`models/README.md`](https://github.com/Project-MTee/translation-worker/tree/main/models)).
+    - `--log-config` - path to logging config files (`logging/logging.ini` by default), `logging/debug.ini` can be used
+      for debug-level logging
+    - `--port` - port of the healthcheck probes (`8000` by default):
 
-## Manual setup
+- Endpoints for healthcheck probes:
+    - `/health/startup`
+    - `/health/readiness`
+    - `/health/liveness`
 
-For a manual setup, please refer to the included Dockerfile and the environment specification described in
-`requirements/requirements.txt`.
-Additionally, [`models/README.md`](https://github.com/project-mtee/translation-worker/tree/main/models) describes how
-models should be set up correctly.
+### Building new images
 
-To initialize the sentence splitting functionality, the following command should be run before starting the application:
+When building the image, the model can be built with different targets. BuildKit should be enabled to skip any unused
+stages of the build.
 
-```python -c "import nltk; nltk.download(\"punkt\")"```
+- `worker-base` - the worker code without any models.
+- `worker-model` - a worker with an included model. Requires **one** of the following build-time arguments:
+    - `MODEL_IMAGE` - the image name where the model is copied from. For example any of
+      the [`translation-model`](https://ghcr.io/project-mtee/translation-model) images.
+    - `MODEL_CONFIG_FILE` - path to the model configuration file, for example `models/general.yaml`. The file must
+      contain the otherwise optional key `huggingface` to download the model or the build will fail.
 
-RabbitMQ and PyTorch parameters should be configured with environment variables as described above. The worker can be
-started with:
+- `env` - an intermediate build stage with all packages installed, but no code.
+- `model-dl` - images that only contain model files and configuration. The separate stage is used to cache this step and
+  speed up builds because HuggingFace downloads can be very slow compared to copying model files from a build stage.
+  Published at [`translation-model`](https://ghcr.io/project-mtee/translation-model). Alternatively, these can be used
+  as init containers to copy models over during startup, but this is quite slow and not recommended.
+- `model` - an alias for the model image, the value of `MODEL_IMAGE` or `model-dl` by default. 
 
-```python main.py [--model-config models/config.yaml] [--log-config logging/logging.ini]```
-
-## Performance and hardware requirements
+### Performance and hardware requirements
 
 The worker loads the NMT model into memory. The exact RAM usage depends on the model and should always be tested, but a
 conservative estimate is to have **8 GB of memory** available (tested with a modular model with 4 input and 4 output
@@ -80,6 +93,22 @@ Although the optimal number of threads depends on the exact model and infrastruc
 around `16`. With optimal configuration and modern hardware, the worker should be able to process ~7 sentences per
 second. For more information, please refer to
 [PyTorch documentation](https://pytorch.org/docs/stable/notes/cpu_threading_torchscript_inference.html).
+
+### Manual / development setup
+
+For a manual setup, please refer to the included Dockerfile and the environment specification described in
+`requirements/requirements.txt`.
+Additionally, [`models/README.md`](https://github.com/project-mtee/translation-worker/tree/main/models) describes how
+models should be set up correctly.
+
+To initialize the sentence splitting functionality, the following command should be run before starting the application:
+
+```python -c "import nltk; nltk.download(\"punkt\")"```
+
+RabbitMQ and PyTorch parameters should be configured with environment variables as described above. The worker can be
+started with:
+
+```python main.py [--model-config models/config.yaml] [--log-config logging/logging.ini] [--port 8000]```
 
 ## Request format
 

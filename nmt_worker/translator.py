@@ -1,6 +1,5 @@
 import itertools
 import logging
-import os
 from typing import List
 import warnings
 
@@ -20,30 +19,37 @@ class Translator:
 
     def __init__(self, model_config: ModelConfig):
         self.model_config = model_config
-        self._load_model()
+
+        try:
+            self._load_model()
+        except OSError as e:
+            logger.exception("Model loading failed. Trying to download model...")
+            self.model_config.download()
+            self._load_model()
 
         if model_config.modular:
             self.translate = self._translate_modular
         else:
             self.translate = self._translate
 
-        logger.info("All NMT models loaded")
+        logger.info(f"All NMT models loaded; "
+                    f"language pairs: {self.model_config.language_pairs}; "
+                    f"domains: {self.model_config.domains}")
 
     def _load_model(self):
-        sentencepiece_path = os.path.join(self.model_config.sentencepiece_dir, self.model_config.sentencepiece_prefix)
         if self.model_config.modular:
             from .modular_interface import ModularHubInterface
             self.model = ModularHubInterface.from_pretrained(
-                model_path=self.model_config.checkpoint_path,
-                sentencepiece_prefix=sentencepiece_path,
+                model_path=self.model_config.checkpoint,
+                sentencepiece_prefix=self.model_config.sentencepiece_prefix,
                 dictionary_path=self.model_config.dict_dir)
         else:
             from fairseq.models.transformer import TransformerModel
             self.model = TransformerModel.from_pretrained(
                 "./",
-                checkpoint_file=self.model_config.checkpoint_path,
+                checkpoint_file=self.model_config.checkpoint,
                 bpe='sentencepiece',
-                sentencepiece_model=f"{sentencepiece_path}.model",
+                sentencepiece_model=f"{self.model_config.sentencepiece_prefix}.model",
                 data_name_or_path=self.model_config.dict_dir
             )
 

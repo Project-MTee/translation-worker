@@ -1,61 +1,58 @@
 # Translation models
 
-Models can be attached to the main [translation-worker](https://github.com/project-mtee/translation-worker) container by
-mounting a volume at `/app/models/`. Official translation models can be downloaded from the 
-[releases](https://github.com/project-mtee/translation-worker/releases) section of this repository. Due to GitHub's 
-file size limitations, these may be uploaded as multipart zip files which have to unpacked first.
-
-Alternatively, models are built into the [`translation-model`](https://ghcr.io/project-mtee/translation-model) images 
-published alongside this repository. These are `busybox` images that simply contain all model files in the 
-`/models/` directory. They can be used as init containers to populate the `/app/models/` volume of the 
-[`translation-worker`](https://ghcr.io/project-mtee/translation-worker) instance. 
-
-Each model is published as a separate image and corresponds to a specific release. Compatibility between 
-[`translation-worker`](https://ghcr.io/project-mtee/translation-worker) and 
-[`translation-model`](https://ghcr.io/project-mtee/translation-model) versions will be specified in the release notes.
+Models are included in some [translation-worker](https://github.com/project-mtee/translation-worker) images, or they can
+be attached to the base image by mounting a volume at `/app/models/`. If a model is not found, the worker will try to
+download it from HuggingFace upon startup. Official translation models can be found
+in [HuggingFace](https://huggingface.co/models?other=MTee&modularNMT) with `MTee` and `ModularNMT` tags.
 
 ## Model configuration
 
 By default, the `translation-worker` looks for a `config.yaml` file on the `/app/models` volume (the `models/` directory
 of the repository). This file should contain the following keys:
 
-- `modular` - `True`or `False` depending on whether the model is a modular multilingual model
-- `language_pairs` - a list of hyphen-separated language pairs
+- `language_pairs` - a list of hyphen-separated language pairs (using 2-letter ISO language codes)
 - `domains` - a list of supported domains
-- `checkpoint` - path of the model checkpoint file (usually named `checkpoint_best.pt`)
-- `dict_dir` - the directory path that contains the model dictionary files (name pattern: `dict.{lang}.txt`)
-- `sentencepiece_dir` - the directory that contains sentencepiece models
-- `sentencepiece_prefix` - the prefix used on all sentencepiece model files
+- `huggingface` (optional) - a HuggingFace model ID. This is used during model build to download the model or upon
+  startup if a model does not exist.
+- `model_root` - a path where the model is stored and loaded from. This path should be absolute or relative to the root
+  directory of this repository. All paths described below are relative to this path.
+- `modular` - `True`or `False` depending on whether the model is a modular multilingual model
+- `checkpoint` - name of the model checkpoint file (usually named `checkpoint_best.pt` (default) or `modular_model.pt`),
+  relative to `model_root`
+- `dict_dir` (optional) - the directory path that contains the model dictionary files (name pattern: `dict.{lang}.txt`),
+  by default, the worker assumes that `model_root` is used.
+- `sentencepiece_dir` - the directory that contains sentencepiece models, by default, the worker assumes
+  that `model_root` is used.
+- `sentencepiece_prefix` - the prefix used on all sentencepiece model files, `sp-model` by default.
 
-All file and directory paths must relative to the root directory of this repository (for example 
-`models/checkpoint_best.pt`). More info on where to find the correct files is documented with our 
+More info on where to find the correct files is documented with our
 [model training workflow](https://github.com/Project-MTee/model_training).
-
-The included Dockerfile can be used to publish new model versions. The build-time argument `MODEL_DIR` can be used to
-specify a subdirectory to be copied to `/models/` instead of the current directory.
 
 ### Configuration samples
 
 Sample configuration for a general domain Estonian-English single direction model:
 
 ```
-modular: False
 language_pairs:
   - et-en
 domains:
   - general
-checkpoint: models/checkpoint_best.pt
-dict_dir: models/dicts/
-sentencepiece_dir: models/sentencepiece/
+
+huggingface: 
+model_root: models/et-en-general
+modular: False
+
+checkpoint: checkpoint_best.pt
+dict_dir: dicts/
+sentencepiece_dir: sentencepiece/
 sentencepiece_prefix: sp-model
 ```
 
 The configuration above matches the following folder structure:
 
 ```
-models/
+models/et-en-general/
 ├── checkpoint_best.pt
-├── config.yaml
 ├── dicts
 │   ├── dict.en.txt
 │   └── dict.et.txt
@@ -69,7 +66,6 @@ models/
 Sample configuration for a general modular Estonian-centric model:
 
 ```
-modular: True
 language_pairs:
   - de-et
   - en-et
@@ -79,30 +75,30 @@ language_pairs:
   - et-ru
 domains:
   - general
-checkpoint: models/checkpoint_best.pt
-dict_dir: models/dicts/
-sentencepiece_dir: models/sentencepiece/
+
+huggingface: tartuNLP/mtee-general
+model_root: models/tartuNLP/mtee-general
+modular: True
+
+checkpoint: modular_model.pt
 sentencepiece_prefix: sp-model
 ```
 
 And a matching folder structure:
 
 ```
-models/
-├── checkpoint_best.pt
-├── config.yaml
-├── dicts
-│   ├── dict.de.txt
-│   ├── dict.en.txt
-│   ├── dict.et.txt
-│   └── dict.ru.txt
-└── sentencepiece
-    ├── sp-model.de.model
-    ├── sp-model.de.vocab
-    ├── sp-model.en.model
-    ├── sp-model.en.vocab
-    ├── sp-model.et.model
-    ├── sp-model.et.vocab
-    ├── sp-model.ru.model
-    └── sp-model.ru.vocab
+models/tartuNLP/mtee-general/
+├── modular_model.pt
+├── dict.de.txt
+├── dict.en.txt
+├── dict.et.txt
+├── dict.ru.txt
+├── sp-model.de.model
+├── sp-model.de.vocab
+├── sp-model.en.model
+├── sp-model.en.vocab
+├── sp-model.et.model
+├── sp-model.et.vocab
+├── sp-model.ru.model
+└── sp-model.ru.vocab
 ```

@@ -1,6 +1,7 @@
 import json
 import logging
 import hashlib
+import threading
 from sys import getsizeof
 from time import time, sleep
 
@@ -12,7 +13,7 @@ from pika import credentials, BlockingConnection, ConnectionParameters
 
 from nmt_worker.schemas import Response, Request, InputType
 from nmt_worker.translator import Translator
-from nmt_worker.config import MQConfig
+from nmt_worker.config import mq_config
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +21,11 @@ X_EXPIRES = 60000
 
 
 class MQConsumer:
-    def __init__(self, translator: Translator, mq_config: MQConfig):
+    def __init__(self, translator: Translator):
         """
         Initializes a RabbitMQ consumer class that listens for requests for a specific worker and responds to
         them.
         """
-        self.mq_config = mq_config
         self.translator = translator
         self.routing_keys = []
         self.queue_name = None
@@ -43,14 +43,14 @@ class MQConsumer:
 
             for domain in self.translator.model_config.domains:
                 for input_type in InputType:
-                    key = f'{self.mq_config.exchange}.{source}.{target}.{domain}.{input_type.value}'
+                    key = f'{mq_config.exchange}.{source}.{target}.{domain}.{input_type.value}'
                     routing_keys.append(key)
         self.routing_keys = sorted(routing_keys)
         hashed = hashlib.sha256(str(self.routing_keys).encode('utf-8')).hexdigest()[:8]
         if self.translator.model_config.modular:
-            self.queue_name = f'{self.mq_config.exchange}.modular.{self.translator.model_config.domains[0]}_{hashed}'
+            self.queue_name = f'{mq_config.exchange}.modular.{self.translator.model_config.domains[0]}_{hashed}'
         else:
-            self.queue_name = f'{self.mq_config.exchange}.{self.translator.model_config.language_pairs[0]}.' \
+            self.queue_name = f'{mq_config.exchange}.{self.translator.model_config.language_pairs[0]}.' \
                               f'{self.translator.model_config.domains[0]}_{hashed}'
 
     def start(self):
@@ -58,46 +58,55 @@ class MQConsumer:
         Connect to RabbitMQ and start listening for requests. Automatically tries to reconnect if the connection
         is lost.
         """
-        while True:
+        t = threading.current_thread()
+        while getattr(t, "consume", True):
             try:
                 self._connect()
+                setattr(t, "connected", True)
                 logger.info('Ready to process requests.')
                 self.channel.start_consuming()
             except pika.exceptions.AMQPConnectionError as e:
+                setattr(t, "connected", False)
                 logger.error(e)
                 logger.info('Trying to reconnect in 5 seconds.')
                 sleep(5)
-            except KeyboardInterrupt:
-                logger.info('Interrupted by user. Exiting...')
-                self.channel.close()
+            except Exception as e:
+                logger.error(e)
+                logger.info('Unexpected error ocurred. Exiting...')
                 break
+
+        if not getattr(t, "consume", True):
+            logger.info('Interrupted by user. Exiting...')
+
+        self.channel.close()
+        setattr(t, "connected", False)
 
     def _connect(self):
         """
         Connects to RabbitMQ, (re)declares the exchange for the service and a queue for the worker binding
         any alternative routing keys as needed.
         """
-        logger.info(f'Connecting to RabbitMQ server: {{host: {self.mq_config.host}, port: {self.mq_config.port}}}')
+        logger.info(f'Connecting to RabbitMQ server: {{host: {mq_config.host}, port: {mq_config.port}}}')
         connection = BlockingConnection(ConnectionParameters(
-            host=self.mq_config.host,
-            port=self.mq_config.port,
+            host=mq_config.host,
+            port=mq_config.port,
             credentials=credentials.PlainCredentials(
-                username=self.mq_config.username,
-                password=self.mq_config.password
+                username=mq_config.username,
+                password=mq_config.password
             ),
-            heartbeat=self.mq_config.heartbeat,
+            heartbeat=mq_config.heartbeat,
             client_properties={
-                'connection_name': self.mq_config.connection_name
+                'connection_name': mq_config.connection_name
             }
         ))
         self.channel = connection.channel()
         self.channel.queue_declare(queue=self.queue_name, arguments={
             'x-expires': X_EXPIRES
         })
-        self.channel.exchange_declare(exchange=self.mq_config.exchange, exchange_type='direct')
+        self.channel.exchange_declare(exchange=mq_config.exchange, exchange_type='direct')
 
         for route in self.routing_keys:
-            self.channel.queue_bind(exchange=self.mq_config.exchange, queue=self.queue_name,
+            self.channel.queue_bind(exchange=mq_config.exchange, queue=self.queue_name,
                                     routing_key=route)
 
         self.channel.basic_qos(prefetch_count=1)
