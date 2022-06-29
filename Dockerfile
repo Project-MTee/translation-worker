@@ -40,7 +40,8 @@ COPY ${MODEL_CONFIG_FILE} /models/config.yaml
 
 RUN HF_MODEL=$(yq '.huggingface' /models/config.yaml) &&  \
     MODEL_ROOT=$(yq '.model_root' /models/config.yaml) &&  \
-    git lfs clone --progress https://huggingface.co/$HF_MODEL $MODEL_ROOT
+    git lfs clone --progress https://huggingface.co/$HF_MODEL $MODEL_ROOT && \
+    rm -r $MODEL_ROOT/.git
 
 FROM $MODEL_IMAGE as model
 
