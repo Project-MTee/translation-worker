@@ -11,10 +11,12 @@ on:
         description: "The model image to use."
         required: true
         type: string
+        default: "ghcr.io/project-mtee/translation-model:modular-general"
       model_flavor:
         description: "The model's flavor, used as image tag suffix."
         required: true
         type: string
+        default: "modular-general"
 
 env:
   # Use docker.io for Docker Hub if empty
