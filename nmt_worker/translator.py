@@ -64,7 +64,10 @@ class Translator:
         translations = []
 
         for text in inputs:
-            sentences, delimiters = sentence_tokenize(text)
+            max_pos = self.model.max_positions[f"{request.src}-{request.tgt}"][0] if self.model_config.modular else \
+                self.model.max_positions[0]
+            sentences, delimiters = sentence_tokenize(text, max_pos)
+
             detagged, tags = preprocess_tags(sentences, request.input_type)
             normalized = [normalize(sentence) for sentence in detagged]
             translated = [translation if normalized[idx] != '' else '' for idx, translation in enumerate(
