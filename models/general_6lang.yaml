@@ -1,0 +1,30 @@
+language_pairs:
+  - de-et
+  - en-et
+  - ru-et
+  - fi-et
+  - uk-et
+  - et-de
+  - et-en
+  - et-ru
+  - et-fi
+  - et-uk
+  - ru-uk
+  - uk-ru
+  - en-uk
+  - uk-en
+  - en-de
+  - de-en
+  - en-fi
+  - fi-en
+  - en-ru
+  - ru-en
+domains:
+  - general
+
+huggingface: tartuNLP/synest-fully-modular
+model_root: models/tartuNLP/synest-fully-modular
+modular: True
+
+checkpoint: modular_model.pt
+sentencepiece_prefix: sp-model

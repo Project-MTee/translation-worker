@@ -50,6 +50,10 @@ FROM env as worker-model
 COPY --chown=app:app --from=model /models /app/models
 COPY --chown=app:app . .
 
+FROM ghcr.io/project-mtee/translation-worker:latest as worker-model-update
+
+COPY --chown=app:app --from=model /models /app/models
+
 FROM env as worker-base
 
 COPY --chown=app:app . .
